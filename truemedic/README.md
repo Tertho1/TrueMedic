@@ -1,6 +1,6 @@
 # truemedic
 
-A new Flutter project.
+A new Flutter project.lets do it
 
 ## Getting Started
 
