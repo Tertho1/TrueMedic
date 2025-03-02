@@ -20,7 +20,24 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
   @override
   void initState() {
     super.initState();
+    _initializeAnimations();
+  }
 
+  @override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  _controller.reset(); // Reset animation
+  _controller.forward(); // Restart animation
+}
+
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _initializeAnimations() {
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
@@ -63,12 +80,6 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
     );
 
     _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 
   @override

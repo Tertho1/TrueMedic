@@ -55,8 +55,6 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
       ),
     );
 
-    
-
     _controller.forward();
   }
 
@@ -102,7 +100,11 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
                             Icons.arrow_back,
                             color: Colors.white,
                           ),
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: (){
+                            Navigator.pop(context);
+                            Navigator.pop(context);
+                            Navigator.pushNamed(context, '/doctor-login');
+                          },
                         ),
                         FadeTransition(
                           opacity: _textFadeAnimation,
@@ -128,16 +130,13 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 140), // Add space to push the logo down
+              const SizedBox(height: 140), // Adjusted space above the logo
               _buildAnimatedLogo(screenWidth),
-              const SizedBox(height: 5),
+              const SizedBox(height: 20), // Space between logo and form
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 10), // Push the form down
-                  child: SlideTransition(
-                    position: _formSlideAnimation,
-                    child: _buildSignupForm(),
-                  ),
+                child: SlideTransition(
+                  position: _formSlideAnimation,
+                  child: _buildSignupForm(),
                 ),
               ),
             ],
@@ -148,9 +147,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   }
 
   Widget _buildAnimatedLogo(double screenWidth) {
-    return Positioned(
-      top: 200, // Adjusted to move the logo down
-      left: (screenWidth - 120) / 2,
+    return Center(
       child: ScaleTransition(
         scale: _logoScaleAnimation,
         child: Container(
@@ -222,7 +219,9 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade800,
                     padding: const EdgeInsets.symmetric(
-                        vertical: 12, horizontal: 50),
+                      vertical: 12,
+                      horizontal: 50,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -236,6 +235,8 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
                 TextButton(
                   onPressed: () {
                     Navigator.pop(context);
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, '/doctor-login');
                   },
                   child: Text(
                     "Already have an account? Login",
