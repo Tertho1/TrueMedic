@@ -16,7 +16,6 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   late Animation<double> _textFadeAnimation;
   late Animation<double> _logoScaleAnimation;
   late Animation<Offset> _formSlideAnimation;
-  late Animation<double> _titleFadeAnimation;
 
   @override
   void initState() {
@@ -56,12 +55,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
       ),
     );
 
-    _titleFadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.6, 0.8, curve: Curves.easeIn),
-      ),
-    );
+    
 
     _controller.forward();
   }
@@ -78,16 +72,72 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
     return Scaffold(
       body: Stack(
         children: [
-          _buildGradientBackground(),
+          // Gradient Background with Animation
+          SlideTransition(
+            position: _gradientSlideAnimation,
+            child: ClipPath(
+              clipper: TriangleClipper(),
+              child: Container(
+                height: 250,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.teal.shade800, Colors.tealAccent.shade700],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      top: 20,
+                      left: 10,
+                      right: 10,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        FadeTransition(
+                          opacity: _textFadeAnimation,
+                          child: const Text(
+                            'TrueMedic',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 40,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 40),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Logo and Form
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const SizedBox(height: 140), // Add space to push the logo down
               _buildAnimatedLogo(screenWidth),
-              SizedBox(height: 20),
+              const SizedBox(height: 5),
               Expanded(
-                child: SlideTransition(
-                  position: _formSlideAnimation,
-                  child: _buildSignupForm(),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10), // Push the form down
+                  child: SlideTransition(
+                    position: _formSlideAnimation,
+                    child: _buildSignupForm(),
+                  ),
                 ),
               ),
             ],
@@ -97,49 +147,9 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
     );
   }
 
-  Widget _buildGradientBackground() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.4,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.teal.shade700, Colors.teal.shade400],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Padding(
-          padding: const EdgeInsets.only(top: 20, left: 10, right: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-              FadeTransition(
-                opacity: _textFadeAnimation,
-                child: const Text(
-                  'TrueMedic',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 40),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildAnimatedLogo(double screenWidth) {
     return Positioned(
-      top: 140,
+      top: 200, // Adjusted to move the logo down
       left: (screenWidth - 120) / 2,
       child: ScaleTransition(
         scale: _logoScaleAnimation,
@@ -169,7 +179,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
 
   Widget _buildSignupForm() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(24.0),
       child: Card(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16.0),
@@ -185,24 +195,24 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
                 Text(
                   "Doctor Signup",
                   style: TextStyle(
-                    fontSize: 22,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.teal.shade800,
+                    color: Colors.blue.shade800,
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 _buildTextField("Full Name"),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildTextField("Email"),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildTextField("Phone Number"),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildTextField("BMDC Registration Number"),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildPasswordField("Password"),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _buildPasswordField("Confirm Password"),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
@@ -210,25 +220,26 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal.shade600,
-                    padding: EdgeInsets.symmetric(vertical: 12, horizontal: 50),
+                    backgroundColor: Colors.blue.shade800,
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 50),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: Text(
+                  child: const Text(
                     "Signup",
                     style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 TextButton(
                   onPressed: () {
                     Navigator.pop(context);
                   },
                   child: Text(
                     "Already have an account? Login",
-                    style: TextStyle(color: Colors.teal.shade800),
+                    style: TextStyle(color: Colors.blue.shade800),
                   ),
                 ),
               ],
@@ -279,4 +290,21 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
       },
     );
   }
+}
+
+// TriangleClipper for the gradient background
+class TriangleClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    Path path = Path();
+    path.lineTo(0, size.height - 50);
+    path.lineTo(size.width / 2, size.height);
+    path.lineTo(size.width, size.height - 50);
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }

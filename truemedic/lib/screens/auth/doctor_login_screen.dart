@@ -171,12 +171,12 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
                   const SizedBox(height: 10), // Gap before "Doctor Login"
                   FadeTransition(
                     opacity: _titleFadeAnimation,
-                    child: const Text(
+                    child: Text(
                       'Doctor Login',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: Colors.blue.shade800,
                       ),
                     ),
                   ),
