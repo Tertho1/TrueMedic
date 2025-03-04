@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase/supabase.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class DoctorSignupScreen extends StatefulWidget {
   const DoctorSignupScreen({super.key});
@@ -16,6 +20,20 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   late Animation<double> _textFadeAnimation;
   late Animation<double> _logoScaleAnimation;
   late Animation<Offset> _formSlideAnimation;
+
+  // Controllers for text fields
+  final _fullNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneNumberController = TextEditingController();
+  final _bmdcController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  // Supabase Client
+  final supabaseClient = SupabaseClient(
+    'https://zntlbtxvhpyoydqggtgw.supabase.co', // Replace with your Supabase project URL
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpudGxidHh2aHB5b3lkcWdndGd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NDY5NjEsImV4cCI6MjA1NjUyMjk2MX0.ghWxTU_yKCkZ5KabTi7n7OGP2J24u0q3erAZgNunw7U', // Replace with your Supabase anon/public key
+  );
 
   @override
   void initState() {
@@ -61,6 +79,12 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   @override
   void dispose() {
     _controller.dispose();
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _phoneNumberController.dispose();
+    _bmdcController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -100,7 +124,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
                             Icons.arrow_back,
                             color: Colors.white,
                           ),
-                          onPressed: (){
+                          onPressed: () {
                             Navigator.pop(context);
                             Navigator.pop(context);
                             Navigator.pushNamed(context, '/doctor-login');
@@ -157,7 +181,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
             shape: BoxShape.circle,
             color: Colors.white,
             image: const DecorationImage(
-              image: AssetImage("logo.jpeg"),
+              image: AssetImage("assets/logo.jpeg"),
               fit: BoxFit.cover,
             ),
             boxShadow: const [
@@ -176,14 +200,19 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
 
   Widget _buildSignupForm() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.only(left: 10, right: 10, top: 20, bottom: 20),
       child: Card(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16.0),
         ),
         elevation: 5,
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.only(
+            left: 10,
+            right: 10,
+            top: 20,
+            bottom: 20,
+          ),
           child: Form(
             key: _formKey,
             child: Column(
@@ -198,22 +227,25 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
                   ),
                 ),
                 const SizedBox(height: 20),
-                _buildTextField("Full Name"),
+                _buildTextField("Full Name", _fullNameController),
                 const SizedBox(height: 10),
-                _buildTextField("Email"),
+                _buildTextField("Email", _emailController),
                 const SizedBox(height: 10),
-                _buildTextField("Phone Number"),
+                _buildTextField("Phone Number", _phoneNumberController),
                 const SizedBox(height: 10),
-                _buildTextField("BMDC Registration Number"),
+                _buildBMDCField(),
                 const SizedBox(height: 10),
-                _buildPasswordField("Password"),
+                _buildPasswordField("Password", _passwordController),
                 const SizedBox(height: 10),
-                _buildPasswordField("Confirm Password"),
+                _buildPasswordField(
+                  "Confirm Password",
+                  _confirmPasswordController,
+                ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (_formKey.currentState!.validate()) {
-                      // Handle signup logic
+                      await _handleSignup();
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -251,8 +283,9 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
     );
   }
 
-  Widget _buildTextField(String label) {
+  Widget _buildTextField(String label, TextEditingController controller) {
     return TextFormField(
+      controller: controller,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
@@ -266,8 +299,47 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
     );
   }
 
-  Widget _buildPasswordField(String label) {
+  Widget _buildBMDCField() {
+    return Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            controller: _bmdcController,
+            decoration: InputDecoration(
+              labelText: "BMDC Registration Number",
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter BMDC Registration Number';
+              }
+              return null;
+            },
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.verified_user),
+          onPressed: () async {
+            final captchaData = await _showCaptchaDialog(context);
+            if (captchaData != null) {
+              final isValid = await _validateBMDC(_bmdcController.text, captchaData['captchaCode'], captchaData['csrfToken'], captchaData['cookies'], captchaData['actionkey']);
+              if (isValid != null && isValid) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('BMDC Number is valid')));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invalid BMDC Number')));
+              }
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasswordField(String label, TextEditingController controller) {
     return TextFormField(
+      controller: controller,
       obscureText: _obscurePassword,
       decoration: InputDecoration(
         labelText: label,
@@ -290,6 +362,168 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
         return null;
       },
     );
+  }
+
+ Future<Map<String, dynamic>?> _showCaptchaDialog(BuildContext context) async {
+  String captchaCode = '';
+  String captchaImageUrl = '';
+  String csrfToken = '';
+  String cookies = '';
+  String actionkey = '';
+
+  try {
+    // First API Request: Get Captcha
+    final captchaResponse = await http.get(Uri.parse('https://bmdc-api.onrender.com/v1/get_captcha'));
+    print('First API Request - Get Captcha:');
+    print('Status Code: ${captchaResponse.statusCode}');
+    print('Response Body: ${captchaResponse.body}');
+
+    if (captchaResponse.statusCode != 200) {
+      throw Exception('Failed to get captcha. Status Code: ${captchaResponse.statusCode}');
+    }
+
+    final captchaData = jsonDecode(captchaResponse.body);
+    print('Captcha Data: $captchaData');
+
+    captchaImageUrl = captchaData['captcha_src'];
+    csrfToken = captchaData['csrf_token_value'];
+    cookies = captchaData['cookies']['bmdckyc_csrf_cookie'];
+    actionkey = captchaData['action_key_value'];
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to load captcha: $e')));
+    return null;
+  }
+
+  return showDialog<Map<String, dynamic>>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Enter Captcha'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.network(captchaImageUrl),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Captcha Code'),
+              onChanged: (value) {
+                captchaCode = value;
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, {
+                'captchaCode': captchaCode,
+                'csrfToken': csrfToken,
+                'cookies': cookies,
+                'actionkey': actionkey,
+              });
+            },
+            child: const Text('Submit'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Future<bool?> _validateBMDC(String bmdcNumber, String captchaCode, String csrfToken, String cookies, String actionkey) async {
+  const String doctorInfoUrl = 'https://bmdc-api.onrender.com/v1/get_info';
+
+  try {
+    // Second API Request: Get Doctor Info
+    final requestBody = jsonEncode({
+      "bmdckyc_csrf_token": csrfToken,
+      "reg_ful_no": bmdcNumber,
+      "captcha_code": captchaCode,
+      "action_key": actionkey,
+      "cookies": cookies
+    });
+
+    print('Second API Request - Get Doctor Info:');
+    print('Request Body: $requestBody');
+
+    final doctorInfoResponse = await http.post(
+      Uri.parse(doctorInfoUrl),
+      body: requestBody,
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    print('Status Code: ${doctorInfoResponse.statusCode}');
+    print('Response Body: ${doctorInfoResponse.body}');
+
+    if (doctorInfoResponse.statusCode != 200) {
+      throw Exception('Failed to get doctor info. Status Code: ${doctorInfoResponse.statusCode}');
+    }
+
+    final doctorInfoData = jsonDecode(doctorInfoResponse.body);
+    print('Doctor Info Data: $doctorInfoData');
+
+    return doctorInfoData['error'] == 'no';
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to validate BMDC number: $e')));
+    return null;
+  }
+}
+
+  // Handle Signup Logic
+  Future<void> _handleSignup() async {
+    final fullName = _fullNameController.text;
+    final email = _emailController.text;
+    final phoneNumber = _phoneNumberController.text;
+    final bmdcNumber = _bmdcController.text;
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    print('Full Name: $fullName');
+    print('Email: $email');
+    print('Phone Number: $phoneNumber');
+    print('BMDC Number: $bmdcNumber');
+    print('Password: $password');
+    print('Confirm Password: $confirmPassword');
+
+    // Validate password match
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+      return;
+    }
+
+    // Firebase Signup
+    try {
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
+
+      // Store Doctor Data in Supabase
+      await supabaseClient.from('doctors').insert({
+        'id': userCredential.user!.uid, // Use Firebase UID as the primary key
+        'full_name': fullName,
+        'email': email,
+        'phone_number': phoneNumber,
+        'bmdc_number': bmdcNumber,
+      });
+
+      // Navigate to the next screen
+      Navigator.pushNamed(context, '/doctor-dashboard');
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Signup failed: ${e.message}')));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error storing data in Supabase: $e')));
+    }
   }
 }
 

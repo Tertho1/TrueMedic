@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
 
 class DoctorLoginScreen extends StatefulWidget {
   const DoctorLoginScreen({super.key});
@@ -24,12 +23,11 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
   }
 
   @override
-void didChangeDependencies() {
-  super.didChangeDependencies();
-  _controller.reset(); // Reset animation
-  _controller.forward(); // Restart animation
-}
-
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller.reset(); // Reset animation
+    _controller.forward(); // Restart animation
+  }
 
   @override
   void dispose() {
@@ -153,7 +151,7 @@ void didChangeDependencies() {
                   shape: BoxShape.circle,
                   color: Colors.white,
                   image: const DecorationImage(
-                    image: AssetImage("logo.jpeg"),
+                    image: AssetImage("assets/logo.jpeg"),
                     fit: BoxFit.cover,
                   ),
                   boxShadow: const [
@@ -172,9 +170,11 @@ void didChangeDependencies() {
           SlideTransition(
             position: _formSlideAnimation,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 300,
+              padding: const EdgeInsets.only(
+                top: 300,
+                left: 20,
+                right: 20,
+                bottom: 100,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,

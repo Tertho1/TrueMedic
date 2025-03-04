@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "E:/Android_Project/TrueMedic/truemedic/windows"
+    "cmake.sourceDirectory": "E:/Android_Project/TrueMedic/truemedic/windows",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

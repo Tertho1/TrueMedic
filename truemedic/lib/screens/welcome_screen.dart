@@ -11,38 +11,25 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _zoomAnimation;
-  late Animation<double> _loadingAnimation;
 
-  bool _showAppName = false; // Controls visibility of app name
-  bool _showLoadingBar = false; // Controls visibility of loading bar
-  bool _showButtons = false; // Show buttons after animations
-
-  String _appName = ""; // Stores the app name with letter-by-letter animation
-  int _currentLetterIndex = 0; // Tracks the current letter index
+  bool _showAppName = false;
+  String _appName = "";
+  int _currentLetterIndex = 0;
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize Animation Controller
     _animationController = AnimationController(
       vsync: this,
       duration: Duration(seconds: 3),
     );
 
-    // Define Zoom Animation
     _zoomAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
-    // Define Loading Bar Animation
-    _loadingAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.linear),
-    );
-
-    // Start Zoom Animation
     _animationController.forward().then((_) {
-      // Show App Name Animation
       setState(() {
         _showAppName = true;
       });
@@ -50,68 +37,50 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     });
   }
 
-  // Function to Animate App Name Letter by Letter
   void _animateAppName() {
     Future.doWhile(() async {
       if (_currentLetterIndex < "TrueMedic".length) {
-        await Future.delayed(Duration(milliseconds: 200)); // Delay
+        await Future.delayed(Duration(milliseconds: 150));
         setState(() {
           _appName += "TrueMedic"[_currentLetterIndex];
           _currentLetterIndex++;
         });
         return true;
       } else {
-        // Show Loading Bar After App Name Animation
-        setState(() {
-          _showLoadingBar = true;
+        Future.delayed(Duration(seconds: 1), () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => LoginScreen()),
+          );
         });
-        _startLoadingBar();
         return false;
       }
     });
   }
 
-  // Function to Start Loading Bar Animation
-  void _startLoadingBar() {
-    _animationController.forward(from: 0.0).then((_) {
-      // Hide Animations and Show Buttons Instead of Navigating
-      Future.delayed(Duration(seconds: 1), () {
-        setState(() {
-          _showAppName = false;
-          _showLoadingBar = false;
-          _showButtons = true;
-        });
-      });
-    });
-  }
-
   @override
   void dispose() {
-    _animationController.dispose(); // Dispose Controller
+    _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.lightBlue.shade100, // Light Blue Background
+      backgroundColor: Colors.lightBlue.shade100,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Zoom-in Animation for the Image
-            if (!_showButtons) // Hide when buttons appear
-              ScaleTransition(
-                scale: _zoomAnimation,
-                child: Image.asset(
-                  'assets/true_medic_logo.png', // Replace with your image path
-                  width: 200,
-                  height: 200,
-                ),
+            ScaleTransition(
+              scale: _zoomAnimation,
+              child: Image.asset(
+                'assets/true_medic_logo.png',
+                width: 200,
+                height: 200,
               ),
+            ),
             SizedBox(height: 20),
-
-            // App Name Animation
             if (_showAppName)
               Text(
                 _appName,
@@ -121,50 +90,109 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   color: Colors.blue.shade900,
                 ),
               ),
-
-            SizedBox(height: 20),
-
-            // Loading Bar
-            if (_showLoadingBar)
-              Container(
-                width: 200,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: AnimatedBuilder(
-                  animation: _loadingAnimation,
-                  builder: (context, child) {
-                    return LinearProgressIndicator(
-                      value: _loadingAnimation.value,
-                      backgroundColor: Colors.transparent,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.blue.shade900,
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-            // Buttons (Only Appear After Animations Finish)
-            if (_showButtons) ...[
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/user-or-doctor');
-                },
-                child: Text("Login / Sign Up"),
-              ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/home'); // Guest mode
-                },
-                child: Text("Continue as Guest"),
-              ),
-            ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class LoginScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Container(
+              width: double.infinity,
+              color: Colors.lightBlue.shade100,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ClipOval(
+                    child: Image.asset(
+                      'truemediclogo.png',
+                      width: 200,
+                      height: 200,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  SizedBox(height: 15),
+                  Text(
+                    'Welcome to TrueMedic!',
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: const Color.fromARGB(255, 6, 49, 113),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/user-or-doctor');
+                      },
+                      child: Text("Login / Sign Up"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade900,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 15),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/home');
+                      },
+                      child: Text("Continue as Guest"),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.blue.shade900,
+                        side: BorderSide(color: Colors.blue.shade900),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
