@@ -98,6 +98,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 }
 
 class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,7 +161,6 @@ class LoginScreen extends StatelessWidget {
                       onPressed: () {
                         Navigator.pushNamed(context, '/user-or-doctor');
                       },
-                      child: Text("Login / Sign Up"),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue.shade900,
                         foregroundColor: Colors.white,
@@ -168,6 +169,7 @@ class LoginScreen extends StatelessWidget {
                         ),
                         padding: EdgeInsets.symmetric(vertical: 14),
                       ),
+                      child: Text("Login / Sign Up"),
                     ),
                   ),
                   SizedBox(height: 15),
@@ -177,7 +179,6 @@ class LoginScreen extends StatelessWidget {
                       onPressed: () {
                         Navigator.pushNamed(context, '/home');
                       },
-                      child: Text("Continue as Guest"),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.blue.shade900,
                         side: BorderSide(color: Colors.blue.shade900),
@@ -186,6 +187,7 @@ class LoginScreen extends StatelessWidget {
                         ),
                         padding: EdgeInsets.symmetric(vertical: 14),
                       ),
+                      child: Text("Continue as Guest"),
                     ),
                   ),
                 ],
