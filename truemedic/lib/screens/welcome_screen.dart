@@ -115,7 +115,7 @@ class LoginScreen extends StatelessWidget {
                 children: [
                   ClipOval(
                     child: Image.asset(
-                      'truemediclogo.png',
+                      'logo.jpeg',
                       width: 200,
                       height: 200,
                       fit: BoxFit.cover,
