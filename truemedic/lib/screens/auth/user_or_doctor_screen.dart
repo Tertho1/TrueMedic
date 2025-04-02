@@ -49,7 +49,7 @@ class UserOrDoctorScreen extends StatelessWidget {
                     backgroundColor: Colors.white,
                     child: ClipOval(
                       child: Image.asset(
-                        'truemediclogo.png',
+                        'logo.jpeg',
                         width: 150,
                         height: 150,
                         fit: BoxFit.cover,
