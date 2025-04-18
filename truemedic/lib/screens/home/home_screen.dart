@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:truemedic/screens/home/search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -115,12 +116,17 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _searchDoctor() {
-    if (_searchController.text.isNotEmpty) {
-      setState(() {
-        _doctorFuture = _fetchDoctorInfo(_searchController.text);
-      });
-    }
+  if (_searchController.text.isNotEmpty) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchResultScreen(
+          registrationNumber: _searchController.text,
+        ),
+      ),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {

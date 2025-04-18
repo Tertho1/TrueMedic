@@ -11,6 +11,7 @@ import 'screens/auth/user_signup_screen.dart';
 import 'screens/auth/doctor_login_screen.dart';
 import 'screens/auth/doctor_signup_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/home/search_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
