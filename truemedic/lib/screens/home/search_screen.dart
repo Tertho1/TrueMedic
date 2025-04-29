@@ -49,103 +49,51 @@ class Doctor {
 
 class SearchResultScreen extends StatefulWidget {
   final String registrationNumber;
+  final int regStudentType;
+  final String sessionId;
+  final String captchaText;
 
-  const SearchResultScreen({super.key, required this.registrationNumber});
+  const SearchResultScreen({
+    super.key,
+    required this.registrationNumber,
+    required this.regStudentType,
+    required this.sessionId,
+    required this.captchaText,
+  });
 
   @override
   _SearchResultScreenState createState() => _SearchResultScreenState();
 }
 
 class _SearchResultScreenState extends State<SearchResultScreen> {
-  Future<Doctor>? _doctorFuture;
-  String? _captchaText;
-  String? _sessionId;
-  String? _csrfToken;
-  String? _actionKey;
-  String? _captchaImageBase64;
+  late Future<Doctor> _doctorFuture;
 
   @override
   void initState() {
     super.initState();
-    _initializeSession();
-  }
-
-  Future<void> _initializeSession() async {
-    try {
-      final response = await http.get(Uri.parse('http://127.0.0.1:8000/init-session'));
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          _sessionId = data['session_id'];
-          _csrfToken = data['csrf_token'];
-          _actionKey = data['action_key'];
-          _captchaImageBase64 = data['captcha_image'];
-        });
-      }
-    } catch (e) {
-      print('Session initialization error: $e');
-    }
+    _doctorFuture = _fetchDoctorInfo();
   }
 
   Future<Doctor> _fetchDoctorInfo() async {
-    if (_sessionId == null || _captchaText == null) {
-      throw Exception('Session not initialized');
+    try {
+      final response = await http.post(
+        Uri.parse('https://tmapi-psi.vercel.app/verify-doctor'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'session_id': widget.sessionId,
+          'registration_number': widget.registrationNumber,
+          'captcha_text': widget.captchaText,
+          'reg_student': widget.regStudentType,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return Doctor.fromJson(json.decode(response.body));
+      }
+      throw Exception('Verification failed: ${response.body}');
+    } catch (e) {
+      throw Exception('Error: ${e.toString()}');
     }
-
-    final response = await http.post(
-      Uri.parse('http://127.0.0.1:8000/verify-doctor'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'session_id': _sessionId,
-        'registration_number': widget.registrationNumber,
-        'captcha_text': _captchaText,
-        'reg_student': 1
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return Doctor.fromJson(json.decode(response.body));
-    } else {
-      throw Exception('Failed to load doctor information: ${response.body}');
-    }
-  }
-
-  void _showCaptchaDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Enter CAPTCHA', style: GoogleFonts.poppins()),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_captchaImageBase64 != null)
-              Image.memory(
-                base64.decode(_captchaImageBase64!),
-                height: 100,
-              ),
-            TextField(
-              onChanged: (value) => _captchaText = value,
-              decoration: InputDecoration(
-                hintText: 'CAPTCHA Code',
-                hintStyle: GoogleFonts.poppins(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _doctorFuture = _fetchDoctorInfo();
-              });
-            },
-            child: Text('Submit', style: GoogleFonts.poppins()),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -153,51 +101,56 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Doctor Details', style: GoogleFonts.poppins()),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed:
+                () => setState(() {
+                  _doctorFuture = _fetchDoctorInfo();
+                }),
+          ),
+        ],
       ),
-      body: _doctorFuture == null
-          ? Center(
-              child: ElevatedButton(
-                onPressed: _showCaptchaDialog,
-                child: Text('Show CAPTCHA'),
+      body: FutureBuilder<Doctor>(
+        future: _doctorFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '${snapshot.error}',
+                    style: GoogleFonts.poppins(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal.shade800,
+                    ),
+                    child: Text(
+                      'Try Again',
+                      style: GoogleFonts.poppins(color: Colors.white),
+                    ),
+                  ),
+                ],
               ),
-            )
-          : FutureBuilder<Doctor>(
-              future: _doctorFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Error: ${snapshot.error}'),
-                        SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: _showCaptchaDialog,
-                          child: Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (snapshot.hasData) {
-                  return _buildDoctorDetails(snapshot.data!);
-                } else {
-                  return Center(
-                    child: ElevatedButton(
-                      onPressed: _showCaptchaDialog,
-                      child: Text('Show CAPTCHA'),
-                    ),
-                  );
-                }
-              },
-            ),
+            );
+          }
+          return _buildDoctorDetails(snapshot.data!);
+        },
+      ),
     );
   }
 
   Widget _buildDoctorDetails(Doctor doctor) {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -206,8 +159,10 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
               child: Image.memory(
                 base64.decode(doctor.doctorImageBase64),
                 height: 150,
+                filterQuality: FilterQuality.high,
               ),
             ),
+          const SizedBox(height: 20),
           _buildDetailItem('Name', doctor.name),
           _buildDetailItem('Registration Number', doctor.registrationNumber),
           _buildDetailItem('Status', doctor.status),
@@ -225,16 +180,27 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
 
   Widget _buildDetailItem(String label, String value) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: GoogleFonts.poppins(
-            fontWeight: FontWeight.bold,
-            color: Colors.teal.shade800
-          )),
-          Text(value, style: GoogleFonts.poppins(fontSize: 16)),
-          Divider(),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              color: Colors.teal.shade800,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const Divider(height: 20),
         ],
       ),
     );

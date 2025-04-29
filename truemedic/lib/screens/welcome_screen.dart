@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -19,10 +20,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   void initState() {
     super.initState();
-
     _animationController = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 3),
+      duration: const Duration(seconds: 3),
     );
 
     _zoomAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
@@ -30,9 +30,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
 
     _animationController.forward().then((_) {
-      setState(() {
-        _showAppName = true;
-      });
+      setState(() => _showAppName = true);
       _animateAppName();
     });
   }
@@ -40,17 +38,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   void _animateAppName() {
     Future.doWhile(() async {
       if (_currentLetterIndex < "TrueMedic".length) {
-        await Future.delayed(Duration(milliseconds: 150));
-        setState(() {
-          _appName += "TrueMedic"[_currentLetterIndex];
-          _currentLetterIndex++;
-        });
+        await Future.delayed(const Duration(milliseconds: 150));
+        setState(() => _appName += "TrueMedic"[_currentLetterIndex++]);
         return true;
       } else {
-        Future.delayed(Duration(seconds: 1), () {
+        Future.delayed(const Duration(seconds: 1), () {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => LoginScreen()),
+            MaterialPageRoute(builder: (_) => const AnimatedLoginScreen()),
           );
         });
         return false;
@@ -80,13 +75,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 height: 200,
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             if (_showAppName)
               Text(
                 _appName,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+                style: GoogleFonts.poppins(
+                  fontSize: 38,
+                  fontWeight: FontWeight.w700,
                   color: Colors.blue.shade900,
                 ),
               ),
@@ -97,105 +92,208 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 }
 
-class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
+class AnimatedLoginScreen extends StatefulWidget {
+  const AnimatedLoginScreen({super.key});
+
+  @override
+  State<AnimatedLoginScreen> createState() => _AnimatedLoginScreenState();
+}
+
+class _AnimatedLoginScreenState extends State<AnimatedLoginScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
+    Future.delayed(
+      const Duration(milliseconds: 300),
+      () => _controller.forward(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Container(
-              width: double.infinity,
-              color: Colors.lightBlue.shade100,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.teal.shade800, Colors.tealAccent.shade700],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Logo and Welcome Message
+            Positioned(
+              top: 130,
+              left: 0,
+              right: 0,
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   ClipOval(
                     child: Image.asset(
-                      'logo.jpeg',
+                      'assets/logo.jpeg',
                       width: 200,
                       height: 200,
                       fit: BoxFit.cover,
                     ),
                   ),
-                  SizedBox(height: 15),
+                  const SizedBox(height: 30),
                   Text(
                     'Welcome to TrueMedic!',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      color: const Color.fromARGB(255, 6, 49, 113),
+                    style: GoogleFonts.poppins(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
                   ),
+                  // const SizedBox(height: 100), // Space between message and white box
                 ],
               ),
             ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
+
+            // Animated White Box
+            SlideTransition(
+              position: _slideAnimation,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 100,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 15,
+                        spreadRadius: 3,
+                        offset: Offset(0, -5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildAuthButton(
+                        text: "Login / Sign Up",
+                        isFilled: true,
+                        icon: Icons.login,
+                        onPressed:
+                            () =>
+                                Navigator.pushNamed(context, '/user-or-doctor'),
+                      ),
+                      const SizedBox(height: 25),
+                      _buildAuthButton(
+                        text: "Continue as Guest",
+                        isFilled: false,
+                        icon: Icons.person_outline,
+                        onPressed: () => Navigator.pushNamed(context, '/home'),
+                      ),
+                    ],
+                  ),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/user-or-doctor');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade900,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: Text("Login / Sign Up"),
-                    ),
-                  ),
-                  SizedBox(height: 15),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/home');
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.blue.shade900,
-                        side: BorderSide(color: Colors.blue.shade900),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: Text("Continue as Guest"),
-                    ),
-                  ),
-                ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildAuthButton({
+    required String text,
+    required bool isFilled,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child:
+          isFilled
+              ? ElevatedButton(
+                onPressed: onPressed,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade900,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 28,
+                    horizontal: 25,
+                  ),
+                  minimumSize: const Size(double.infinity, 55),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 24, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Text(
+                      text,
+                      style: GoogleFonts.poppins(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : OutlinedButton(
+                onPressed: onPressed,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.blue.shade900,
+                  side: BorderSide(color: Colors.blue.shade900, width: 2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 28,
+                    horizontal: 25,
+                  ),
+                  minimumSize: const Size(double.infinity, 55),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 24, color: Colors.blue.shade900),
+                    const SizedBox(width: 12),
+                    Text(
+                      text,
+                      style: GoogleFonts.poppins(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
     );
   }
 }

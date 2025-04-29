@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:truemedic/screens/home/search_screen.dart';
+import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,62 +12,21 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class Doctor {
-  final String name;
-  final String specialization;
-  final String registrationNumber;
-  final String hospital;
-  final int experience;
-
-  Doctor({
-    required this.name,
-    required this.specialization,
-    required this.registrationNumber,
-    required this.hospital,
-    required this.experience,
-  });
-
-  factory Doctor.fromJson(Map<String, dynamic> json) {
-    return Doctor(
-      name: json['name'],
-      specialization: json['specialization'],
-      registrationNumber: json['registrationNumber'],
-      hospital: json['hospital'],
-      experience: json['experience'],
-    );
-  }
-}
-
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  Future<Doctor>? _doctorFuture;
-  List<Doctor> _topDoctors = [];
   late AnimationController _controller;
   late Animation<Offset> _gradientSlideAnimation;
   late Animation<double> _logoScaleAnimation;
   late Animation<Offset> _contentSlideAnimation;
+  int _regStudentType = 1;
+  String? _sessionId;
+  String? _captchaImageBase64;
+  bool _isCaptchaLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _topDoctors = [
-      Doctor(
-        name: 'Dr. Sarah Johnson',
-        specialization: 'Cardiologist',
-        registrationNumber: 'REG-1234',
-        hospital: 'City General Hospital',
-        experience: 15,
-      ),
-      Doctor(
-        name: 'Dr. Michael Chen',
-        specialization: 'Neurologist',
-        registrationNumber: 'REG-5678',
-        hospital: 'Central Medical Center',
-        experience: 12,
-      ),
-    ];
-
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
@@ -103,314 +63,418 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  Future<Doctor> _fetchDoctorInfo(String registrationNumber) async {
-    final response = await http.get(
-      Uri.parse('https://your-api-endpoint.com/doctors/$registrationNumber'),
-    );
-
-    if (response.statusCode == 200) {
-      return Doctor.fromJson(json.decode(response.body));
-    } else {
-      throw Exception('Failed to load doctor information');
+  Future<void> _initializeSession() async {
+    setState(() => _isCaptchaLoading = true);
+    try {
+      final response = await http.get(
+        Uri.parse('https://tmapi-psi.vercel.app/init-session'),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _sessionId = data['session_id'];
+          _captchaImageBase64 = data['captcha_image'];
+        });
+      }
+    } finally {
+      setState(() => _isCaptchaLoading = false);
     }
   }
 
-  void _searchDoctor() {
-  if (_searchController.text.isNotEmpty) {
+  void _validateAndSearch() {
+    final regNumber = _searchController.text;
+
+    if (regNumber.isEmpty) {
+      _showErrorSnackbar('Please enter registration number');
+      return;
+    }
+
+    if (!RegExp(r'^\d+$').hasMatch(regNumber)) {
+      _showErrorSnackbar('Only numbers are allowed');
+      return;
+    }
+
+    if (_regStudentType == 1) {
+      if (regNumber.length != 6) {
+        _showErrorSnackbar('MBBS registration must be 6 digits');
+        return;
+      }
+    } else {
+      if (regNumber.length >= 6) {
+        _showErrorSnackbar('BDS registration must be less than 6 digits');
+        return;
+      }
+    }
+
+    _initializeSession().then((_) {
+      if (_captchaImageBase64 != null) _showCaptchaDialog();
+    });
+  }
+
+  void _showCaptchaDialog() {
+    TextEditingController captchaController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: Row(
+                    children: [
+                      Text('Verify CAPTCHA', style: GoogleFonts.poppins()),
+                      IconButton(
+                        icon: Icon(Icons.refresh),
+                        onPressed:
+                            _isCaptchaLoading
+                                ? null
+                                : () async {
+                                  setState(() => _isCaptchaLoading = true);
+                                  await _initializeSession();
+                                  setState(() => _isCaptchaLoading = false);
+                                },
+                      ),
+                    ],
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isCaptchaLoading)
+                        LinearProgressIndicator()
+                      else if (_captchaImageBase64 != null)
+                        Container(
+                          height: 100,
+                          child: Image.memory(
+                            base64.decode(_captchaImageBase64!),
+                          ),
+                        ),
+                      SizedBox(height: 20),
+                      TextField(
+                        controller: captchaController,
+                        autofocus: true,
+                        maxLength: 4,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-Z0-9]'),
+                          ), // Allow only alphanumeric characters
+                        ],
+                        decoration: InputDecoration(
+                          hintText: 'Enter CAPTCHA code',
+                          border: OutlineInputBorder(),
+                          counterText: '',
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed:
+                          () =>
+                              _handleCaptchaSubmission(captchaController.text),
+                      child: Text('Verify'),
+                    ),
+                  ],
+                ),
+          ),
+    );
+  }
+
+  void _handleCaptchaSubmission(String captchaText) {
+    if (captchaText.isEmpty) {
+      _showErrorSnackbar('Please enter CAPTCHA code');
+      return;
+    }
+
+    Navigator.pop(context);
+    _navigateToResults(captchaText);
+  }
+
+  void _navigateToResults(String captchaText) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SearchResultScreen(
-          registrationNumber: _searchController.text,
-        ),
+        builder:
+            (context) => SearchResultScreen(
+              registrationNumber: _searchController.text,
+              regStudentType: _regStudentType,
+              sessionId: _sessionId!,
+              captchaText: captchaText,
+            ),
       ),
     );
   }
-}
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Gradient Background
-          SlideTransition(
-            position: _gradientSlideAnimation,
-            child: ClipPath(
-              clipper: TriangleClipper(),
-              child: Container(
-                height: 250,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.teal.shade800, Colors.tealAccent.shade700],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            SlideTransition(
+              position: _gradientSlideAnimation,
+              child: ClipPath(
+                clipper: TriangleClipper(),
+                child: Container(
+                  height: 220,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.teal.shade800,
+                        Colors.tealAccent.shade700,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
                   ),
-                ),
-                child: Align(
-                  alignment: Alignment.topCenter,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 50),
-                    child: Text(
-                      'TrueMedic',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 40,
-                        fontWeight: FontWeight.bold,
-                        shadows: const [
-                          Shadow(
-                            blurRadius: 10.0,
-                            color: Colors.black,
-                            offset: Offset(3.0, 3.0),)
-                        ],
+                    padding: const EdgeInsets.only(top: 30),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Text(
+                        'TrueMedic',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          shadows: const [
+                            Shadow(
+                              blurRadius: 10.0,
+                              color: Colors.black,
+                              offset: Offset(3.0, 3.0),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
 
-          // Back Button
-          Positioned(
-            top: 40,
-            left: 20,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 30),
-              onPressed: () => Navigator.pop(context),
+            Positioned(
+              top: 30,
+              left: 20,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                  size: 30,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
             ),
-          ),
 
-          // Logo
-          Positioned(
-            top: 140,
-            left: 0,
-            right: 0,
-            child: ScaleTransition(
-              scale: _logoScaleAnimation,
-              child: Center(
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    image: const DecorationImage(
-                      image: AssetImage("assets/logo.jpeg"),
-                      fit: BoxFit.cover,
+            Positioned(
+              top: 100,
+              left: 0,
+              right: 0,
+              child: ScaleTransition(
+                scale: _logoScaleAnimation,
+                child: Center(
+                  child: Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      image: const DecorationImage(
+                        image: AssetImage("assets/logo.jpeg"),
+                        fit: BoxFit.cover,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x4D000000),
+                          offset: Offset(0, 4),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ],
                     ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x4D000000),
-                        offset: Offset(0, 4),
-                        blurRadius: 6,
-                        spreadRadius: 1,
+                  ),
+                ),
+              ),
+            ),
+
+            SlideTransition(
+              position: _contentSlideAnimation,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 200, bottom: 60),
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: RadioListTile<int>(
+                                  title: Text(
+                                    'MBBS',
+                                    style: GoogleFonts.poppins(),
+                                  ),
+                                  value: 1,
+                                  groupValue: _regStudentType,
+                                  onChanged:
+                                      (value) => setState(() {
+                                        _regStudentType = value!;
+                                        _searchController.clear();
+                                      }),
+                                ),
+                              ),
+                              Expanded(
+                                child: RadioListTile<int>(
+                                  title: Text(
+                                    'BDS',
+                                    style: GoogleFonts.poppins(),
+                                  ),
+                                  value: 2,
+                                  groupValue: _regStudentType,
+                                  onChanged:
+                                      (value) => setState(() {
+                                        _regStudentType = value!;
+                                        _searchController.clear();
+                                      }),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 20,
+                        ),
+                        child: Container(
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 20),
+                                  child: TextField(
+                                    controller: _searchController,
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(6),
+                                    ],
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter Registration Number...',
+                                      hintStyle: GoogleFonts.poppins(
+                                        fontSize: 16,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                      border: InputBorder.none,
+                                    ),
+                                    style: GoogleFonts.poppins(fontSize: 16),
+                                    onSubmitted: (_) => _validateAndSearch(),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                height: 50,
+                                margin: const EdgeInsets.only(right: 5),
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.teal.shade800,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                    ),
+                                  ),
+                                  onPressed: _validateAndSearch,
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.search,
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Search',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 16,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-          ),
 
-          // Content Area
-          SlideTransition(
-            position: _contentSlideAnimation,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 260),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Search Box with Button
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 20),
-                      child: Container(
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(15),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 20),
-                                child: TextField(
-                                  controller: _searchController,
-                                  decoration: InputDecoration(
-                                    hintText: 'Enter Registration Number...',
-                                    hintStyle: GoogleFonts.poppins(
-                                        fontSize: 16,
-                                        color: Colors.grey.shade600),
-                                    border: InputBorder.none,
-                                  ),
-                                  style: GoogleFonts.poppins(fontSize: 16),
-                                  onSubmitted: (_) => _searchDoctor(),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              height: 50,
-                              margin: const EdgeInsets.only(right: 5),
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal.shade800,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 20),
-                                ),
-                                onPressed: _searchDoctor,
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.search,
-                                        color: Colors.white),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Search',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 16,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 60,
+                color: Colors.teal.shade800.withOpacity(0.9),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Center(
+                  child: Text(
+                    '© ${DateTime.now().year} TrueMedic. All rights reserved.',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
-
-                    // Search Results
-                    FutureBuilder<Doctor>(
-                      future: _doctorFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const CircularProgressIndicator();
-                        } else if (snapshot.hasError) {
-                          return Text(
-                            'Error: ${snapshot.error}',
-                            style: GoogleFonts.poppins(color: Colors.red),
-                          );
-                        } else if (snapshot.hasData) {
-                          return _buildDoctorCard(snapshot.data!);
-                        } else {
-                          return const SizedBox.shrink();
-                        }
-                      },
-                    ),
-
-                    // Top Doctors Section
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(
-                        'Top Doctors',
-                        style: GoogleFonts.poppins(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.teal.shade800,
-                        ),
-                      ),
-                    ),
-                    ..._topDoctors.map((doctor) => _buildDoctorCard(doctor)),
-                    
-                    // Footer Spacer
-                    const SizedBox(height: 80),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Footer
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 60,
-              color: Colors.teal.shade800.withOpacity(0.9),
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Center(
-                child: Text(
-                  '© ${DateTime.now().year} TrueMedic. All rights reserved.',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDoctorCard(Doctor doctor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                doctor.name,
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal.shade800,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildInfoRow('Specialization:', doctor.specialization),
-              _buildInfoRow('Registration:', doctor.registrationNumber),
-              _buildInfoRow('Hospital:', doctor.hospital),
-              _buildInfoRow('Experience:', '${doctor.experience} years'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            value,
-            style: GoogleFonts.poppins(color: Colors.grey.shade800),
-          ),
-        ],
       ),
     );
   }
