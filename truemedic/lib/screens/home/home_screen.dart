@@ -143,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen>
                       if (_isCaptchaLoading)
                         LinearProgressIndicator()
                       else if (_captchaImageBase64 != null)
-                        Container(
+                        SizedBox(
                           height: 100,
                           child: Image.memory(
                             base64.decode(_captchaImageBase64!),
