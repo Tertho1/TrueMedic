@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase/supabase.dart';
 import '../common_ui.dart';
+import '../loading_indicator.dart'; // Create this for loading states
 
 class UserSignupScreen extends StatefulWidget {
   const UserSignupScreen({super.key});
@@ -14,6 +15,7 @@ class _UserSignupScreenState extends State<UserSignupScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
+  bool _isLoading = false;
   late AnimationController _controller;
   late Animation<Offset> _formSlideAnimation;
 
@@ -25,7 +27,7 @@ class _UserSignupScreenState extends State<UserSignupScreen>
   final _confirmPasswordController = TextEditingController();
 
   // Supabase Client
-  final supabaseClient = SupabaseClient(
+  static final supabaseClient = SupabaseClient(
     'https://zntlbtxvhpyoydqggtgw.supabase.co',
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpudGxidHh2aHB5b3lkcWdndGd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NDY5NjEsImV4cCI6MjA1NjUyMjk2MX0.ghWxTU_yKCkZ5KabTi7n7OGP2J24u0q3erAZgNunw7U',
   );
@@ -87,6 +89,7 @@ class _UserSignupScreenState extends State<UserSignupScreen>
               child: _buildSignupForm(),
             ),
           ),
+          if (_isLoading) const LoadingIndicator(),
         ],
       ),
     );
@@ -123,7 +126,10 @@ class _UserSignupScreenState extends State<UserSignupScreen>
                 const SizedBox(height: 15),
                 _buildPasswordField("Password", _passwordController),
                 const SizedBox(height: 15),
-                _buildPasswordField("Confirm Password", _confirmPasswordController),
+                _buildPasswordField(
+                  "Confirm Password",
+                  _confirmPasswordController,
+                ),
                 const SizedBox(height: 25),
                 _buildSignupButton(),
                 const SizedBox(height: 15),
@@ -155,17 +161,23 @@ class _UserSignupScreenState extends State<UserSignupScreen>
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
         suffixIcon: IconButton(
-          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+          icon: Icon(
+            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+          ),
           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
       ),
-      validator: (value) => value!.isEmpty ? 'Please enter $label' : null,
+      validator: (value) {
+        if (value!.isEmpty) return 'Please enter $label';
+        if (value.length < 6) return 'Password must be at least 6 characters';
+        return null;
+      },
     );
   }
 
   Widget _buildSignupButton() {
     return ElevatedButton(
-      onPressed: _submitForm,
+      onPressed: _isLoading ? null : _submitForm,
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.blue.shade800,
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 40),
@@ -180,7 +192,10 @@ class _UserSignupScreenState extends State<UserSignupScreen>
 
   Widget _buildLoginLink() {
     return TextButton(
-      onPressed: () => Navigator.pushReplacementNamed(context, '/user-login'),
+      onPressed:
+          _isLoading
+              ? null
+              : () => Navigator.pushReplacementNamed(context, '/user-login'),
       child: Text(
         "Already have an account? Login",
         style: TextStyle(color: Colors.blue.shade800),
@@ -191,32 +206,102 @@ class _UserSignupScreenState extends State<UserSignupScreen>
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')));
-      return;
-    }
+    setState(() => _isLoading = true);
 
     try {
+      // 1. Create Firebase user
       final userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
-            email: _emailController.text,
-            password: _passwordController.text);
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
 
-      await supabaseClient.from('users').insert({
-        'id': userCredential.user!.uid,
-        'full_name': _fullNameController.text,
-        'email': _emailController.text,
-        'phone_number': _phoneNumberController.text,
-      });
+      // 2. Store additional user data in Supabase
+      await _storeUserData(userCredential.user!.uid);
 
-      Navigator.pushReplacementNamed(context, '/home');
+      // 3. Check user role and navigate accordingly
+      await _handlePostSignupNavigation(userCredential.user!.uid);
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Signup failed: ${e.message}')));
+      _handleAuthError(e);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error storing data: $e')));
+      _handleGenericError(e);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _storeUserData(String userId) async {
+    try {
+      final response =
+          await supabaseClient.from('users').insert({
+            'id': userId,
+            'full_name': _fullNameController.text.trim(),
+            'email': _emailController.text.trim(),
+            'phone_number': _phoneNumberController.text.trim(),
+            'role': 'user',
+            'created_at': DateTime.now().toIso8601String(),
+          }).select();
+
+      // Check if the response doesn't contain any data
+      if (response.isEmpty) {
+        throw Exception('Failed to insert user data');
+      }
+    } catch (e) {
+      throw Exception('Database error: ${e.toString()}');
+    }
+  }
+
+  Future<void> _handlePostSignupNavigation(String userId) async {
+    try {
+      final response =
+          await supabaseClient
+              .from('users')
+              .select('role')
+              .eq('id', userId)
+              .single();
+
+      // If we get here, response should contain data
+      final userData = response as Map<String, dynamic>;
+      final role = userData['role'] as String?;
+
+      if (role == null) {
+        throw Exception('User role not found');
+      }
+
+      // Navigate based on role
+      if (role == 'admin') {
+        Navigator.pushReplacementNamed(context, '/admin-dashboard');
+      } else {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    } catch (e) {
+      throw Exception('Failed to retrieve user role: ${e.toString()}');
+    }
+  }
+
+  void _handleAuthError(FirebaseAuthException e) {
+    String message = 'Signup failed: ';
+    switch (e.code) {
+      case 'email-already-in-use':
+        message += 'Email already registered';
+        break;
+      case 'invalid-email':
+        message += 'Invalid email address';
+        break;
+      case 'weak-password':
+        message += 'Password is too weak';
+        break;
+      default:
+        message += e.message ?? 'Unknown error';
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _handleGenericError(dynamic e) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
   }
 }
