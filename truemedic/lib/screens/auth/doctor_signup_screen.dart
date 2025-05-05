@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:supabase/supabase.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../common_ui.dart';
 
 class DoctorSignupScreen extends StatefulWidget {
@@ -21,6 +24,12 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   String? _sessionId;
   String? _captchaImageBase64;
   bool _isCaptchaLoading = false;
+  String? _doctorType;
+  final List<String> _doctorTypes = ['MBBS', 'BDS'];
+  File? _selectedImage;
+  Uint8List? _selectedImageBytes;
+  bool _isImageUploading = false;
+  final ImagePicker _picker = ImagePicker();
 
   // Controllers
   final _fullNameController = TextEditingController();
@@ -34,10 +43,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   final _bloodGroupController = TextEditingController();
   final _birthYearController = TextEditingController();
 
-  final supabaseClient = SupabaseClient(
-    'https://zntlbtxvhpyoydqggtgw.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpudGxidHh2aHB5b3lkcWdndGd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NDY5NjEsImV4cCI6MjA1NjUyMjk2MX0.ghWxTU_yKCkZ5KabTi7n7OGP2J24u0q3erAZgNunw7U',
-  );
+  final supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -80,6 +86,59 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile == null) return;
+
+    if (kIsWeb) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        _selectedImageBytes = bytes;
+        _selectedImage = null;
+      });
+    } else {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+        _selectedImageBytes = null;
+      });
+    }
+  }
+
+  Future<String?> _uploadImage() async {
+    if ((kIsWeb && _selectedImageBytes == null) ||
+        (!kIsWeb && _selectedImage == null)) {
+      return null;
+    }
+
+    setState(() => _isImageUploading = true);
+    try {
+      final fileExt = kIsWeb ? 'jpg' : _selectedImage!.path.split('.').last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final filePath = 'doctor_verification/$fileName';
+
+      if (kIsWeb) {
+        await supabase.storage
+            .from('verification_images')
+            .uploadBinary(filePath, _selectedImageBytes!);
+      } else {
+        await supabase.storage
+            .from('verification_images')
+            .upload(filePath, _selectedImage!);
+      }
+
+      return supabase.storage
+          .from('verification_images')
+          .getPublicUrl(filePath);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Image upload failed: ${e.toString()}')),
+      );
+      return null;
+    } finally {
+      setState(() => _isImageUploading = false);
+    }
+  }
+
   Future<void> _initializeSession() async {
     setState(() => _isCaptchaLoading = true);
     try {
@@ -100,45 +159,50 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
 
   Future<String?> _showCaptchaDialog() async {
     TextEditingController captchaController = TextEditingController();
-    
+
     await _initializeSession();
-    
+
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Verify CAPTCHA'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_isCaptchaLoading)
-                const CircularProgressIndicator()
-              else if (_captchaImageBase64 != null)
-                Image.memory(base64.decode(_captchaImageBase64!)),
-              const SizedBox(height: 20),
-              TextField(
-                controller: captchaController,
-                decoration: const InputDecoration(
-                  labelText: 'Enter CAPTCHA',
-                  border: OutlineInputBorder(),
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: const Text('Verify CAPTCHA'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isCaptchaLoading)
+                        const CircularProgressIndicator()
+                      else if (_captchaImageBase64 != null)
+                        Image.memory(base64.decode(_captchaImageBase64!))
+                      else
+                        const Text('Failed to load CAPTCHA'),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: captchaController,
+                        decoration: const InputDecoration(
+                          labelText: 'Enter CAPTCHA',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLength: 4,
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed:
+                          () => Navigator.pop(context, captchaController.text),
+                      child: const Text('Verify'),
+                    ),
+                  ],
                 ),
-                maxLength: 4,
-              ),
-            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, captchaController.text),
-              child: const Text('Verify'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -151,7 +215,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
           'session_id': _sessionId,
           'registration_number': _bmdcController.text,
           'captcha_text': captchaText,
-          'reg_student': 1,
+          'reg_student': _doctorType == 'MBBS' ? 1 : 2,
         }),
       );
 
@@ -166,20 +230,46 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   }
 
   bool _validateAllInfo(Map<String, dynamic> apiData) {
-    return _fullNameController.text.toLowerCase() == (apiData['name']?.toLowerCase() ?? '') &&
-           _fatherNameController.text.toLowerCase() == (apiData['father_name']?.toLowerCase() ?? '') &&
-           _motherNameController.text.toLowerCase() == (apiData['mother_name']?.toLowerCase() ?? '') &&
-           _birthYearController.text == (apiData['birth_year']?.toString() ?? '') &&
-           _bloodGroupController.text.toUpperCase() == (apiData['blood_group']?.toUpperCase() ?? '') &&
-           _bmdcController.text == (apiData['registration_number']?.toString() ?? '');
+    final apiDob = apiData['dob']?.toString() ?? '';
+    final apiYear = apiDob.split('/').length == 3 ? apiDob.split('/').last : '';
+
+    final apiBmdc = (apiData['registration_number']?.toString() ?? '')
+        .replaceAll(RegExp(r'[^0-9]'), '');
+    final inputBmdc = _bmdcController.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    return _fullNameController.text.trim().toLowerCase() ==
+            (apiData['name']?.toString().trim().toLowerCase() ?? '') &&
+        _fatherNameController.text.trim().toLowerCase() ==
+            (apiData['father_name']?.toString().trim().toLowerCase() ?? '') &&
+        _motherNameController.text.trim().toLowerCase() ==
+            (apiData['mother_name']?.toString().trim().toLowerCase() ?? '') &&
+        _birthYearController.text.trim() == apiYear &&
+        _bloodGroupController.text.trim().toUpperCase() ==
+            (apiData['blood_group']?.toString().trim().toUpperCase() ?? '') &&
+        inputBmdc == apiBmdc;
   }
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_passwordController.text != _confirmPasswordController.text) {
+    if (_doctorType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')));
+        const SnackBar(content: Text('Please select doctor type')),
+      );
+      return;
+    }
+
+    if (_selectedImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload a verification image')),
+      );
+      return;
+    }
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
       return;
     }
 
@@ -187,43 +277,64 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
     if (captchaText == null || captchaText.isEmpty) return;
 
     final isValid = await _verifyAndCompareData(captchaText);
-    
+
     if (!isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Information mismatch with BMDC records')));
+        const SnackBar(content: Text('Information mismatch with BMDC records')),
+      );
       return;
     }
 
     try {
-      final userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text,
-            password: _passwordController.text);
+      // Upload image first
+      final imageUrl = await _uploadImage();
+      if (imageUrl == null) return;
 
-      await supabaseClient.from('doctors').insert({
-        'id': userCredential.user!.uid,
-        'full_name': _fullNameController.text,
-        'email': _emailController.text,
-        'phone_number': _phoneNumberController.text,
-        'bmdc_number': _bmdcController.text,
-        'father_name': _fatherNameController.text,
-        'mother_name': _motherNameController.text,
-        'blood_group': _bloodGroupController.text,
-        'birth_year': _birthYearController.text,
+      // Create user with Supabase Auth
+      final authResponse = await supabase.auth.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (authResponse.user == null) {
+        throw Exception('User creation failed');
+      }
+
+      // Insert doctor data
+      await supabase.from('doctors').insert({
+        'id': authResponse.user!.id,
+        'full_name': _fullNameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'phone_number': _phoneNumberController.text.trim(),
+        'bmdc_number': _bmdcController.text.trim(),
+        'doctor_type': _doctorType,
+        'father_name': _fatherNameController.text.trim(),
+        'mother_name': _motherNameController.text.trim(),
+        'blood_group': _bloodGroupController.text.trim().toUpperCase(),
+        'birth_year': _birthYearController.text.trim(),
+        'verification_image_url': imageUrl, // Store the image URL
         'verified': false,
         'verification_pending': true,
+        'created_at': DateTime.now().toIso8601String(),
       });
 
       Navigator.pushReplacementNamed(context, '/verification-pending');
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Signup failed: ${e.message}')));
+        SnackBar(content: Text('Authentication error: ${e.message}')),
+      );
+    } on PostgrestException catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Database error: ${e.message}')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
   }
 
+  @override
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -260,30 +371,142 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade800,
+                              color: Colors.teal.shade800,
                             ),
                           ),
                           const SizedBox(height: 20),
+                          DropdownButtonFormField<String>(
+                            value: _doctorType,
+                            decoration: InputDecoration(
+                              labelText: 'Doctor Type',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                            ),
+                            items:
+                                _doctorTypes.map((String value) {
+                                  return DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value),
+                                  );
+                                }).toList(),
+                            onChanged: (newValue) {
+                              setState(() {
+                                _doctorType = newValue;
+                              });
+                            },
+                            validator: (value) {
+                              if (value == null) {
+                                return 'Please select doctor type';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 15),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Verification Image',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: _pickImage,
+                                child: Container(
+                                  height: 150,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child:
+                                      _selectedImage != null
+                                          ? Image.file(
+                                            _selectedImage!,
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                          )
+                                          : _selectedImageBytes != null
+                                          ? Image.memory(
+                                            _selectedImageBytes!,
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                          )
+                                          : Center(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                  Icons.add_a_photo,
+                                                  size: 40,
+                                                  color: Colors.grey,
+                                                ),
+                                                Text(
+                                                  'Tap to upload image',
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                ),
+                              ),
+                              if (_selectedImage != null ||
+                                  _selectedImageBytes != null)
+                                TextButton(
+                                  onPressed: _pickImage,
+                                  child: const Text('Change Image'),
+                                ),
+                              if (_isImageUploading)
+                                const LinearProgressIndicator(),
+                            ],
+                          ),
+                          // [Rest of your form fields remain the same]
+                          const SizedBox(height: 15),
                           _buildTextField("Full Name", _fullNameController),
                           const SizedBox(height: 15),
                           _buildTextField("Email", _emailController),
                           const SizedBox(height: 15),
-                          _buildTextField("Phone Number", _phoneNumberController),
+                          _buildTextField(
+                            "Phone Number",
+                            _phoneNumberController,
+                          ),
                           const SizedBox(height: 15),
-                          _buildTextField("BMDC Registration Number", _bmdcController),
+                          _buildTextField(
+                            "BMDC Registration Number",
+                            _bmdcController,
+                            keyboardType: TextInputType.number,
+                          ),
                           const SizedBox(height: 15),
-                          _buildTextField("Father's Name", _fatherNameController),
+                          _buildTextField(
+                            "Father's Name",
+                            _fatherNameController,
+                          ),
                           const SizedBox(height: 15),
-                          _buildTextField("Mother's Name", _motherNameController),
+                          _buildTextField(
+                            "Mother's Name",
+                            _motherNameController,
+                          ),
                           const SizedBox(height: 15),
                           _buildTextField("Blood Group", _bloodGroupController),
                           const SizedBox(height: 15),
-                          _buildTextField("Birth Year", _birthYearController,
-                            keyboardType: TextInputType.number),
+                          _buildTextField(
+                            "Birth Year",
+                            _birthYearController,
+                            keyboardType: TextInputType.number,
+                          ),
                           const SizedBox(height: 15),
                           _buildPasswordField("Password", _passwordController),
                           const SizedBox(height: 15),
-                          _buildPasswordField("Confirm Password", _confirmPasswordController),
+                          _buildPasswordField(
+                            "Confirm Password",
+                            _confirmPasswordController,
+                          ),
                           const SizedBox(height: 25),
                           _buildSignupButton(),
                           const SizedBox(height: 15),
@@ -301,15 +524,28 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller,
-      {TextInputType keyboardType = TextInputType.text}) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller, {
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
       ),
-      validator: (value) => value!.isEmpty ? 'Please enter $label' : null,
+      validator: (value) {
+        if (value == null || value.isEmpty) return 'Please enter $label';
+        if (label == "Birth Year" && !RegExp(r'^\d{4}$').hasMatch(value)) {
+          return 'Enter valid 4-digit year';
+        }
+        if (label == "Blood Group" &&
+            !RegExp(r'^[ABO]{1,2}[+-]$').hasMatch(value.toUpperCase())) {
+          return 'Invalid blood group format';
+        }
+        return null;
+      },
       keyboardType: keyboardType,
     );
   }
@@ -322,11 +558,17 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
         suffixIcon: IconButton(
-          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+          icon: Icon(
+            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+          ),
           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
       ),
-      validator: (value) => value!.isEmpty ? 'Please enter $label' : null,
+      validator: (value) {
+        if (value == null || value.isEmpty) return 'Please enter $label';
+        if (value.length < 8) return 'Password must be at least 8 characters';
+        return null;
+      },
     );
   }
 
@@ -334,7 +576,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
     return ElevatedButton(
       onPressed: _submitForm,
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blue.shade800,
+        backgroundColor: Colors.teal.shade800,
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 40),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
@@ -350,7 +592,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
       onPressed: () => Navigator.pushReplacementNamed(context, '/doctor-login'),
       child: Text(
         "Already have an account? Login",
-        style: TextStyle(color: Colors.blue.shade800),
+        style: TextStyle(color: Colors.teal.shade800),
       ),
     );
   }

@@ -1,9 +1,13 @@
+// home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:supabase/supabase.dart';
 import 'search_screen.dart';
+import '../common_ui.dart';
+import '../loading_indicator.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,32 +20,28 @@ class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   late AnimationController _controller;
-  late Animation<Offset> _gradientSlideAnimation;
-  late Animation<double> _logoScaleAnimation;
   late Animation<Offset> _contentSlideAnimation;
   int _regStudentType = 1;
+  int _searchType = 0;
   String? _sessionId;
   String? _captchaImageBase64;
   bool _isCaptchaLoading = false;
 
+  final SupabaseClient supabaseClient = SupabaseClient(
+    'https://zntlbtxvhpyoydqggtgw.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpudGxidHh2aHB5b3lkcWdndGd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NDY5NjEsImV4cCI6MjA1NjUyMjk2MX0.ghWxTU_yKCkZ5KabTi7n7OGP2J24u0q3erAZgNunw7U',
+  );
+
   @override
   void initState() {
     super.initState();
+    _initializeAnimations();
+  }
+
+  void _initializeAnimations() {
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
-    );
-
-    _gradientSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, -1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
-    _logoScaleAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.4, 0.9, curve: Curves.elasticOut),
-      ),
     );
 
     _contentSlideAnimation = Tween<Offset>(
@@ -60,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     _controller.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -82,33 +83,110 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _validateAndSearch() {
-    final regNumber = _searchController.text;
+    final searchQuery = _searchController.text.trim();
 
-    if (regNumber.isEmpty) {
-      _showErrorSnackbar('Please enter registration number');
+    if (searchQuery.isEmpty) {
+      _showErrorSnackbar('Please enter search query');
       return;
     }
 
-    if (!RegExp(r'^\d+$').hasMatch(regNumber)) {
-      _showErrorSnackbar('Only numbers are allowed');
-      return;
-    }
-
-    if (_regStudentType == 1) {
-      if (regNumber.length != 6) {
-        _showErrorSnackbar('MBBS registration must be 6 digits');
-        return;
-      }
+    if (_searchType == 0) {
+      _handleBmdcSearch(searchQuery);
     } else {
-      if (regNumber.length >= 6) {
-        _showErrorSnackbar('BDS registration must be less than 6 digits');
-        return;
-      }
+      _handleNameSearch(searchQuery);
+    }
+  }
+
+  void _handleBmdcSearch(String bmdcNumber) {
+    if (!RegExp(r'^\d+$').hasMatch(bmdcNumber)) {
+      _showErrorSnackbar('Only numbers are allowed for BMDC');
+      return;
+    }
+
+    if (_regStudentType == 1 && bmdcNumber.length != 6) {
+      _showErrorSnackbar('MBBS registration must be 6 digits');
+      return;
+    }
+    if (_regStudentType == 2 && bmdcNumber.length >= 6) {
+      _showErrorSnackbar('BDS registration must be less than 6 digits');
+      return;
     }
 
     _initializeSession().then((_) {
       if (_captchaImageBase64 != null) _showCaptchaDialog();
     });
+  }
+
+  void _handleNameSearch(String name) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const LoadingIndicator(),
+    );
+
+    try {
+      final doctors = await _searchLocalDatabase(name);
+      Navigator.pop(context);
+
+      if (doctors.isEmpty) {
+        _showErrorSnackbar('No doctors found. Try BMDC search first.');
+        return;
+      }
+
+      _showNameSearchResults(doctors);
+    } catch (e) {
+      Navigator.pop(context);
+      _showErrorSnackbar('Search failed: ${e.toString()}');
+    }
+  }
+
+  Future<List<Doctor>> _searchLocalDatabase(String name) async {
+    final table = _regStudentType == 1 ? 'mbbs_doctors' : 'bds_doctors';
+
+    final response = await supabaseClient
+        .from(table)
+        .select()
+        .ilike('full_name', '%$name%');
+
+    if (response is PostgrestException) {
+      throw Exception('Failed to fetch data from Supabase');
+    }
+
+    final data = response as List;
+    return data.map((doc) => Doctor.fromJson(doc)).toList();
+  }
+
+  void _showNameSearchResults(List<Doctor> doctors) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Select Doctor'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: doctors.length,
+                itemBuilder:
+                    (context, index) => ListTile(
+                      title: Text(doctors[index].fullName),
+                      subtitle: Text(doctors[index].bmdcNumber),
+                      onTap: () => _navigateToDoctorDetails(doctors[index]),
+                    ),
+              ),
+            ),
+          ),
+    );
+  }
+
+  void _navigateToDoctorDetails(Doctor doctor) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => SearchResultScreen(doctor: doctor, isFromLocal: true),
+      ),
+    );
   }
 
   void _showCaptchaDialog() {
@@ -125,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen>
                     children: [
                       Text('Verify CAPTCHA', style: GoogleFonts.poppins()),
                       IconButton(
-                        icon: Icon(Icons.refresh),
+                        icon: const Icon(Icons.refresh),
                         onPressed:
                             _isCaptchaLoading
                                 ? null
@@ -141,15 +219,32 @@ class _HomeScreenState extends State<HomeScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_isCaptchaLoading)
-                        LinearProgressIndicator()
+                        Container(
+                          height: 100,
+                          alignment: Alignment.center,
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.teal.shade800,
+                            ),
+                          ),
+                        )
                       else if (_captchaImageBase64 != null)
                         SizedBox(
                           height: 100,
                           child: Image.memory(
                             base64.decode(_captchaImageBase64!),
                           ),
+                        )
+                      else
+                        Container(
+                          height: 100,
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Failed to load CAPTCHA',
+                            style: GoogleFonts.poppins(color: Colors.red),
+                          ),
                         ),
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
                       TextField(
                         controller: captchaController,
                         autofocus: true,
@@ -157,9 +252,9 @@ class _HomeScreenState extends State<HomeScreen>
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
                             RegExp(r'[a-zA-Z0-9]'),
-                          ), // Allow only alphanumeric characters
+                          ),
                         ],
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           hintText: 'Enter CAPTCHA code',
                           border: OutlineInputBorder(),
                           counterText: '',
@@ -170,13 +265,13 @@ class _HomeScreenState extends State<HomeScreen>
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: Text('Cancel'),
+                      child: const Text('Cancel'),
                     ),
                     TextButton(
                       onPressed:
                           () =>
                               _handleCaptchaSubmission(captchaController.text),
-                      child: Text('Verify'),
+                      child: const Text('Verify'),
                     ),
                   ],
                 ),
@@ -194,24 +289,248 @@ class _HomeScreenState extends State<HomeScreen>
     _navigateToResults(captchaText);
   }
 
-  void _navigateToResults(String captchaText) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => SearchResultScreen(
-              registrationNumber: _searchController.text,
-              regStudentType: _regStudentType,
-              sessionId: _sessionId!,
-              captchaText: captchaText,
-            ),
-      ),
+  void _navigateToResults(String captchaText) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const LoadingIndicator(),
     );
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://tmapi-psi.vercel.app/verify-doctor'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'session_id': _sessionId,
+          'registration_number': _searchController.text,
+          'captcha_text': captchaText,
+          'reg_student': _regStudentType,
+        }),
+      );
+
+      Navigator.pop(context);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final doctor = Doctor.fromJson(data);
+
+        await _storeDoctorLocally(doctor);
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) =>
+                    SearchResultScreen(doctor: doctor, isFromLocal: false),
+          ),
+        );
+      } else {
+        _showErrorSnackbar('Failed to fetch doctor details');
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      _showErrorSnackbar('Error: ${e.toString()}');
+    }
+  }
+
+  Future<void> _storeDoctorLocally(Doctor doctor) async {
+    final table = _regStudentType == 1 ? 'mbbs_doctors' : 'bds_doctors';
+    await supabaseClient.from(table).upsert({
+      'bmdc_number': doctor.bmdcNumber,
+      'full_name': doctor.fullName,
+      'father_name': doctor.fatherName,
+      'mother_name': doctor.motherName,
+      'blood_group': doctor.bloodGroup,
+      'birth_year': doctor.birthYear,
+      'reg_year': doctor.regYear,
+      'valid_till': doctor.validTill,
+      'status': doctor.status,
+      'card_number': doctor.cardNumber,
+      'dob': doctor.dob,
+      'image_base64': doctor.doctorImageBase64,
+    });
   }
 
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  Widget _buildSearchTypeSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: RadioListTile<int>(
+                title: Text('Search By BMDC Number', style: GoogleFonts.poppins()),
+                value: 0,
+                groupValue: _searchType,
+                onChanged:
+                    (value) => setState(() {
+                      _searchType = value!;
+                      _searchController.clear();
+                    }),
+              ),
+            ),
+            Expanded(
+              child: RadioListTile<int>(
+                title: Text('Search By Name', style: GoogleFonts.poppins()),
+                value: 1,
+                groupValue: _searchType,
+                onChanged:
+                    (value) => setState(() {
+                      _searchType = value!;
+                      _searchController.clear();
+                    }),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudentTypeSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: RadioListTile<int>(
+                title: Text('MBBS', style: GoogleFonts.poppins()),
+                value: 1,
+                groupValue: _regStudentType,
+                onChanged:
+                    (value) => setState(() {
+                      _regStudentType = value!;
+                      _searchController.clear();
+                    }),
+              ),
+            ),
+            Expanded(
+              child: RadioListTile<int>(
+                title: Text('BDS', style: GoogleFonts.poppins()),
+                value: 2,
+                groupValue: _regStudentType,
+                onChanged:
+                    (value) => setState(() {
+                      _regStudentType = value!;
+                      _searchController.clear();
+                    }),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+      child: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 20),
+                child: TextField(
+                  controller: _searchController,
+                  keyboardType:
+                      _searchType == 0
+                          ? TextInputType.number
+                          : TextInputType.text,
+                  inputFormatters:
+                      _searchType == 0
+                          ? [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(6),
+                          ]
+                          : null,
+                  decoration: InputDecoration(
+                    hintText:
+                        _searchType == 0
+                            ? 'Enter Registration Number...'
+                            : 'Enter Doctor Name...',
+                    hintStyle: GoogleFonts.poppins(
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                    border: InputBorder.none,
+                  ),
+                  style: GoogleFonts.poppins(fontSize: 16),
+                  onSubmitted: (_) => _validateAndSearch(),
+                ),
+              ),
+            ),
+            Container(
+              height: 50,
+              margin: const EdgeInsets.only(right: 5),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal.shade800,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                ),
+                onPressed: _validateAndSearch,
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Search',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -221,237 +540,30 @@ class _HomeScreenState extends State<HomeScreen>
       body: SizedBox.expand(
         child: Stack(
           children: [
-            SlideTransition(
-              position: _gradientSlideAnimation,
-              child: ClipPath(
-                clipper: TriangleClipper(),
-                child: Container(
-                  height: 220,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.teal.shade800,
-                        Colors.tealAccent.shade700,
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 30),
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: Text(
-                        'TrueMedic',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          shadows: const [
-                            Shadow(
-                              blurRadius: 10.0,
-                              color: Colors.black,
-                              offset: Offset(3.0, 3.0),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+            TopClippedDesign(
+              gradient: LinearGradient(
+                colors: [Colors.teal.shade800, Colors.tealAccent.shade700],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
+              showBackButton: true,
+              logoAsset: "assets/logo.jpeg",
             ),
-
-            Positioned(
-              top: 30,
-              left: 20,
-              child: IconButton(
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: Colors.white,
-                  size: 30,
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-
-            Positioned(
-              top: 100,
-              left: 0,
-              right: 0,
-              child: ScaleTransition(
-                scale: _logoScaleAnimation,
-                child: Center(
-                  child: Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      image: const DecorationImage(
-                        image: AssetImage("assets/logo.jpeg"),
-                        fit: BoxFit.cover,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x4D000000),
-                          offset: Offset(0, 4),
-                          blurRadius: 6,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
             SlideTransition(
               position: _contentSlideAnimation,
               child: Padding(
-                padding: const EdgeInsets.only(top: 200, bottom: 60),
+                padding: const EdgeInsets.only(top: 300, bottom: 60),
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
-                        ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 10,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: RadioListTile<int>(
-                                  title: Text(
-                                    'MBBS',
-                                    style: GoogleFonts.poppins(),
-                                  ),
-                                  value: 1,
-                                  groupValue: _regStudentType,
-                                  onChanged:
-                                      (value) => setState(() {
-                                        _regStudentType = value!;
-                                        _searchController.clear();
-                                      }),
-                                ),
-                              ),
-                              Expanded(
-                                child: RadioListTile<int>(
-                                  title: Text(
-                                    'BDS',
-                                    style: GoogleFonts.poppins(),
-                                  ),
-                                  value: 2,
-                                  groupValue: _regStudentType,
-                                  onChanged:
-                                      (value) => setState(() {
-                                        _regStudentType = value!;
-                                        _searchController.clear();
-                                      }),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 20,
-                        ),
-                        child: Container(
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 10,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(left: 20),
-                                  child: TextField(
-                                    controller: _searchController,
-                                    keyboardType: TextInputType.number,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                      LengthLimitingTextInputFormatter(6),
-                                    ],
-                                    decoration: InputDecoration(
-                                      hintText: 'Enter Registration Number...',
-                                      hintStyle: GoogleFonts.poppins(
-                                        fontSize: 16,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      border: InputBorder.none,
-                                    ),
-                                    style: GoogleFonts.poppins(fontSize: 16),
-                                    onSubmitted: (_) => _validateAndSearch(),
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                height: 50,
-                                margin: const EdgeInsets.only(right: 5),
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.teal.shade800,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                    ),
-                                  ),
-                                  onPressed: _validateAndSearch,
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.search,
-                                        color: Colors.white,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Search',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 16,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                      _buildSearchTypeSelector(),
+                      _buildStudentTypeSelector(),
+                      _buildSearchField(),
                     ],
                   ),
                 ),
               ),
             ),
-
             Positioned(
               bottom: 0,
               left: 0,
@@ -478,20 +590,4 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
-}
-
-class TriangleClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    Path path = Path();
-    path.lineTo(0, size.height - 50);
-    path.lineTo(size.width / 2, size.height);
-    path.lineTo(size.width, size.height - 50);
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }

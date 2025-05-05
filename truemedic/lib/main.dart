@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Removed Firebase imports
 import 'package:google_fonts/google_fonts.dart';
 
 import 'screens/welcome_screen.dart';
@@ -11,15 +9,11 @@ import 'screens/auth/user_signup_screen.dart';
 import 'screens/auth/doctor_login_screen.dart';
 import 'screens/auth/doctor_signup_screen.dart';
 import 'screens/home/home_screen.dart';
-// import 'screens/home/admin_dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
+  // Removed Firebase initialization
   await Supabase.initialize(
     url: 'https://zntlbtxvhpyoydqggtgw.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpudGxidHh2aHB5b3lkcWdndGd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NDY5NjEsImV4cCI6MjA1NjUyMjk2MX0.ghWxTU_yKCkZ5KabTi7n7OGP2J24u0q3erAZgNunw7U',
@@ -49,7 +43,6 @@ class MyApp extends StatelessWidget {
         '/doctor-login': (context) => const DoctorLoginScreen(),
         '/doctor-signup': (context) => const DoctorSignupScreen(),
         '/home': (context) => const HomeScreen(),
-        // '/admin-dashboard': (context) => const AdminDashboard(),
       },
     );
   }

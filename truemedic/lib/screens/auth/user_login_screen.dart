@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../common_ui.dart';
+import '../loading_indicator.dart';
 
 class UserLoginScreen extends StatefulWidget {
   const UserLoginScreen({super.key});
@@ -13,6 +15,15 @@ class _UserLoginScreenState extends State<UserLoginScreen>
   late AnimationController _controller;
   late Animation<Offset> _formSlideAnimation;
   late Animation<double> _titleFadeAnimation;
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  // Controllers
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  final supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -30,6 +41,8 @@ class _UserLoginScreenState extends State<UserLoginScreen>
   @override
   void dispose() {
     _controller.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -83,58 +96,91 @@ class _UserLoginScreenState extends State<UserLoginScreen>
                 right: 20,
                 bottom: 100,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 10),
-                  FadeTransition(
-                    opacity: _titleFadeAnimation,
-                    child: Text(
-                      'User Login',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade800,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 10),
+                    FadeTransition(
+                      opacity: _titleFadeAnimation,
+                      child: Text(
+                        'User Login',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade800,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(Icons.person, 'Email or Phone'),
-                  const SizedBox(height: 20),
-                  _buildTextField(Icons.lock, 'Password', obscureText: true),
-                  const SizedBox(height: 20),
-                  _buildLoginButton(),
-                  const SizedBox(height: 10),
-                  _buildForgotPasswordButton(),
-                  const SizedBox(height: 10),
-                  _buildSignUpButton(),
-                ],
+                    const SizedBox(height: 20),
+                    _buildEmailField(),
+                    const SizedBox(height: 20),
+                    _buildPasswordField(),
+                    const SizedBox(height: 20),
+                    _buildLoginButton(),
+                    const SizedBox(height: 10),
+                    _buildForgotPasswordButton(),
+                    const SizedBox(height: 10),
+                    _buildSignUpButton(),
+                  ],
+                ),
               ),
             ),
           ),
+          if (_isLoading) const LoadingIndicator(),
         ],
       ),
     );
   }
 
-  Widget _buildTextField(
-    IconData icon,
-    String label, {
-    bool obscureText = false,
-  }) {
-    return TextField(
-      obscureText: obscureText,
+  Widget _buildEmailField() {
+    return TextFormField(
+      controller: _emailController,
       decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
+        labelText: 'Email',
+        prefixIcon: const Icon(Icons.email),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter your email';
+        }
+        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+          return 'Please enter a valid email';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return TextFormField(
+      controller: _passwordController,
+      obscureText: _obscurePassword,
+      decoration: InputDecoration(
+        labelText: 'Password',
+        prefixIcon: const Icon(Icons.lock),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        suffixIcon: IconButton(
+          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        ),
       ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter your password';
+        }
+        if (value.length < 6) {
+          return 'Password must be at least 6 characters';
+        }
+        return null;
+      },
     );
   }
 
   Widget _buildLoginButton() {
     return ElevatedButton(
-      onPressed: () {},
+      onPressed: _isLoading ? null : _loginUser,
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 100),
         backgroundColor: Colors.blue.shade800,
@@ -147,9 +193,42 @@ class _UserLoginScreenState extends State<UserLoginScreen>
     );
   }
 
+  Future<void> _loginUser() async {
+    if (!_formKey.currentState!.validate()) return;
+    
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await supabase.auth.signInWithPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (response.user == null) throw Exception('Login failed');
+      if (response.user?.emailConfirmedAt == null) {
+        throw AuthException('Please verify your email first');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Login successful!'),
+          duration: Duration(seconds: 5),
+        ),
+      );
+      Navigator.pushReplacementNamed(context, '/home');
+    } on AuthException catch (e) {
+      _handleAuthError(e);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Widget _buildForgotPasswordButton() {
     return TextButton(
-      onPressed: () {},
+      onPressed: _isLoading ? null : _resetPassword,
       child: const Text(
         'Forgot Password?',
         style: TextStyle(color: Colors.blue),
@@ -157,15 +236,60 @@ class _UserLoginScreenState extends State<UserLoginScreen>
     );
   }
 
+  Future<void> _resetPassword() async {
+    if (_emailController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email first')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    try {
+      await supabase.auth.resetPasswordForEmail(
+        _emailController.text.trim(),
+        redirectTo: 'http://localhost:3000/reset-password',
+      );
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset email sent!')),
+      );
+    } on AuthException catch (e) {
+      _handleAuthError(e);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Widget _buildSignUpButton() {
     return TextButton(
-      onPressed: () {
-        Navigator.pushNamed(context, '/user-signup');
-      },
+      onPressed: _isLoading
+          ? null
+          : () => Navigator.pushNamed(context, '/user-signup'),
       child: const Text(
         "Don't have an account? Sign Up",
         style: TextStyle(color: Colors.blue),
       ),
     );
+  }
+
+  void _handleAuthError(AuthException e) {
+    String message = 'Login failed: ';
+    switch (e.message) {
+      case 'Invalid login credentials':
+        message = 'Invalid email or password';
+        break;
+      case 'Email not confirmed':
+        message = 'Please verify your email first';
+        break;
+      default:
+        message += e.message;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 }
