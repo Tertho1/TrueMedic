@@ -1,104 +1,202 @@
 import 'package:flutter/material.dart';
-import 'package:supabase/supabase.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../common_ui.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
   @override
-  _AdminDashboardScreenState createState() => _AdminDashboardScreenState();
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  final SupabaseClient supabaseClient = SupabaseClient(
-    'https://zntlbtxvhpyoydqggtgw.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpudGxidHh2aHB5b3lkcWdndGd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NDY5NjEsImV4cCI6MjA1NjUyMjk2MX0.ghWxTU_yKCkZ5KabTi7n7OGP2J24u0q3erAZgNunw7U',
-  );
-
-  List<Map<String, dynamic>> _pendingDoctors = [];
+  final supabase = Supabase.instance.client;
+  Map<String, dynamic>? _userProfile;
+  int _currentIndex = 0;
   bool _isLoading = true;
-  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    _loadPendingVerifications();
+    _loadUserData();
   }
 
-  Future<void> _loadPendingVerifications() async {
+  Future<void> _loadUserData() async {
     try {
-      final response = await supabaseClient
-          .from('doctors')
-          .select('*')
-          .eq('verification_pending', true);
-
-      setState(() {
-        _pendingDoctors = List<Map<String, dynamic>>.from(response);
-        _isLoading = false;
-      });
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        final response = await supabase
+            .from('users')
+            .select()
+            .eq('id', user.id)
+            .single();
+        setState(() {
+          _userProfile = response;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load data: $e';
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading user data: ${e.toString()}')),
+      );
     }
   }
 
-  Future<void> _updateDoctorStatus(String doctorId, bool isApproved) async {
-    try {
-      await supabaseClient
-          .from('doctors')
-          .update({
-            'verified': isApproved,
-            'verification_pending': false,
-            'verification_date': DateTime.now().toIso8601String(),
-          })
-          .eq('id', doctorId);
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: const Text('Admin Dashboard'),
+        centerTitle: true,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _buildDashboardContent(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        selectedItemColor: Colors.blue[800],
+        unselectedItemColor: Colors.grey[600],
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'Users',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
+        ],
+      ),
+    );
+  }
 
-      // Refresh the list
-      await _loadPendingVerifications();
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
+  Widget _buildDashboardContent() {
+    switch (_currentIndex) {
+      case 0:
+        return _buildDashboardTab();
+      case 1:
+        return _buildUsersTab();
+      case 2:
+        return _buildSettingsTab();
+      default:
+        return _buildDashboardTab();
     }
   }
 
-  Widget _buildDoctorCard(Map<String, dynamic> doctor) {
+  Widget _buildDashboardTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildWelcomeCard(),
+          const SizedBox(height: 20),
+          _buildStatsGrid(),
+          const SizedBox(height: 20),
+          _buildRecentActivity(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWelcomeCard() {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              doctor['full_name'] ?? 'No Name',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              'Welcome back, ${_userProfile?['name'] ?? 'Admin'}!',
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
-            _buildDetailRow('BMDC Number:', doctor['bmdc_number']),
-            _buildDetailRow('Email:', doctor['email']),
-            _buildDetailRow('Phone:', doctor['phone_number']),
-            _buildDetailRow('Father\'s Name:', doctor['father_name']),
-            _buildDetailRow('Mother\'s Name:', doctor['mother_name']),
-            _buildDetailRow('Blood Group:', doctor['blood_group']),
-            _buildDetailRow('Birth Year:', doctor['birth_year']),
+            const Text(
+              'Here\'s what\'s happening with your app today.',
+              style: TextStyle(color: Colors.grey),
+            ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _buildActionButton(
-                  icon: Icons.check,
-                  color: Colors.green,
-                  onPressed: () => _updateDoctorStatus(doctor['id'], true),
-                ),
-                const SizedBox(width: 8),
-                _buildActionButton(
-                  icon: Icons.close,
-                  color: Colors.red,
-                  onPressed: () => _updateDoctorStatus(doctor['id'], false),
-                ),
-              ],
+            _userProfile?['avatar_url'] != null
+                ? CircleAvatar(
+                    radius: 30,
+                    backgroundImage: NetworkImage(_userProfile!['avatar_url']),
+                  )
+                : const CircleAvatar(
+                    radius: 30,
+                    child: Icon(Icons.person, size: 30),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsGrid() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 1.2,
+      children: [
+        _buildStatCard('Total Users', '1,234', Icons.people, Colors.blue),
+        _buildStatCard('Active Today', '567', Icons.today, Colors.green),
+        _buildStatCard('New Signups', '89', Icons.person_add, Colors.orange),
+        _buildStatCard('Reports', '23', Icons.report, Colors.red),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 30, color: color),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
@@ -106,65 +204,106 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String? value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildRecentActivity() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Recent Activity',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 5,
+              separatorBuilder: (context, index) => const Divider(),
+              itemBuilder: (context, index) {
+                return ListTile(
+                  leading: const CircleAvatar(
+                    radius: 20,
+                    child: Icon(Icons.person, size: 20),
+                  ),
+                  title: Text('User ${index + 1} performed an action'),
+                  subtitle: Text('${index + 1} hour${index == 0 ? '' : 's'} ago'),
+                  trailing: const Icon(Icons.chevron_right),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUsersTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value ?? 'Not provided',
-              style: TextStyle(color: value == null ? Colors.grey : null),
+          const Icon(Icons.people, size: 50, color: Colors.grey),
+          const SizedBox(height: 16),
+          Text(
+            'User Management',
+            style: TextStyle(
+              fontSize: 20,
+              color: Colors.grey[600],
             ),
           ),
+          const SizedBox(height: 8),
+          const Text('This section will display user management features'),
         ],
       ),
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return IconButton(
-      icon: Icon(icon, color: color),
-      style: IconButton.styleFrom(
-        backgroundColor: color.withOpacity(0.1),
-        padding: const EdgeInsets.all(8),
+  Widget _buildSettingsTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.settings, size: 50, color: Colors.grey),
+          const SizedBox(height: 16),
+          Text(
+            'App Settings',
+            style: TextStyle(
+              fontSize: 20,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text('This section will display app configuration options'),
+        ],
       ),
-      onPressed: onPressed,
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Doctor Verifications'),
-        centerTitle: true,
-        elevation: 0,
-      ),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMessage.isNotEmpty
-              ? Center(child: Text(_errorMessage))
-              : _pendingDoctors.isEmpty
-              ? const Center(child: Text('No pending verifications'))
-              : RefreshIndicator(
-                onRefresh: _loadPendingVerifications,
-                child: ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  itemCount: _pendingDoctors.length,
-                  itemBuilder:
-                      (context, index) =>
-                          _buildDoctorCard(_pendingDoctors[index]),
-                ),
-              ),
-    );
+  Future<void> _logout() async {
+    try {
+      await supabase.auth.signOut();
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/user-login',
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error logging out: ${e.toString()}')),
+        );
+      }
+    }
   }
 }
