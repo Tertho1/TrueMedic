@@ -244,11 +244,6 @@ class _UserLoginScreenState extends State<UserLoginScreen>
       final response =
           await supabase.from('users').select('role').eq('id', userId).single();
 
-      // With the newer Supabase SDK, response is already the data
-      if (response == null) {
-        throw Exception('User role not found');
-      }
-
       return response['role'] ?? 'user';
     } catch (e) {
       ScaffoldMessenger.of(
