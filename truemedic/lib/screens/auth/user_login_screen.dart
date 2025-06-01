@@ -140,7 +140,8 @@ class _UserLoginScreenState extends State<UserLoginScreen>
       decoration: InputDecoration(
         labelText: 'Email',
         prefixIcon: const Icon(Icons.email),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      ),
       validator: (value) {
         if (value == null || value.isEmpty) {
           return 'Please enter your email';
@@ -162,7 +163,9 @@ class _UserLoginScreenState extends State<UserLoginScreen>
         prefixIcon: const Icon(Icons.lock),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         suffixIcon: IconButton(
-          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+          icon: Icon(
+            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+          ),
           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
       ),
@@ -195,7 +198,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
 
   Future<void> _loginUser() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
 
     try {
@@ -208,21 +211,50 @@ class _UserLoginScreenState extends State<UserLoginScreen>
       if (response.user?.emailConfirmedAt == null) {
         throw AuthException('Please verify your email first');
       }
+
+      // Get user role from Supabase
+      final userRole = await _getUserRole(response.user!.id);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Login successful!'),
           duration: Duration(seconds: 5),
         ),
       );
-      Navigator.pushReplacementNamed(context, '/home');
+
+      // Navigate based on role
+      if (userRole == 'admin') {
+        Navigator.pushReplacementNamed(context, '/admin-dashboard');
+      } else {
+        Navigator.pushReplacementNamed(context, '/user-dashboard');
+      }
     } on AuthException catch (e) {
       _handleAuthError(e);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login failed: ${e.toString()}')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<String> _getUserRole(String userId) async {
+    try {
+      final response =
+          await supabase.from('users').select('role').eq('id', userId).single();
+
+      // With the newer Supabase SDK, response is already the data
+      if (response == null) {
+        throw Exception('User role not found');
+      }
+
+      return response['role'] ?? 'user';
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error fetching user role: $e')));
+      return 'user';
     }
   }
 
@@ -245,22 +277,22 @@ class _UserLoginScreenState extends State<UserLoginScreen>
     }
 
     setState(() => _isLoading = true);
-    
+
     try {
       await supabase.auth.resetPasswordForEmail(
         _emailController.text.trim(),
         redirectTo: 'http://localhost:3000/reset-password',
       );
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password reset email sent!')),
       );
     } on AuthException catch (e) {
       _handleAuthError(e);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -268,9 +300,10 @@ class _UserLoginScreenState extends State<UserLoginScreen>
 
   Widget _buildSignUpButton() {
     return TextButton(
-      onPressed: _isLoading
-          ? null
-          : () => Navigator.pushNamed(context, '/user-signup'),
+      onPressed:
+          _isLoading
+              ? null
+              : () => Navigator.pushNamed(context, '/user-signup'),
       child: const Text(
         "Don't have an account? Sign Up",
         style: TextStyle(color: Colors.blue),
@@ -290,6 +323,8 @@ class _UserLoginScreenState extends State<UserLoginScreen>
       default:
         message += e.message;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
