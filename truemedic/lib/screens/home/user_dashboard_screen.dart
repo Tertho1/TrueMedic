@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../common_ui.dart';
 import '../loading_indicator.dart';
+import 'edit_profile_screen.dart'; // Import the EditProfileScreen
 
 class UserDashboardScreen extends StatefulWidget {
   const UserDashboardScreen({super.key});
@@ -65,6 +66,20 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     }
   }
 
+  void _navigateToEditProfile() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfileScreen(userProfile: _userProfile!),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Refresh profile if edit was successful
+      _fetchUserProfile();
+    }
+  }
+
   Widget _buildProfileInfo() {
     if (_userProfile == null) {
       return const Center(child: Text('No profile data available'));
@@ -90,9 +105,20 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           child: const Icon(Icons.person, size: 50, color: Colors.blue),
         ),
         const SizedBox(height: 20),
-        Text(
-          _userProfile!['full_name'] ?? 'No Name',
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _userProfile!['full_name'] ?? 'No Name',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 10),
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blue),
+              onPressed: () => _navigateToEditProfile(),
+              tooltip: 'Edit Profile',
+            ),
+          ],
         ),
         const SizedBox(height: 10),
         Text(
@@ -150,7 +176,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           ),
           Padding(
             padding: const EdgeInsets.only(
-              top: 250,
+              top: 270,
               left: 20,
               right: 20,
             ), // Increased from 150 to 220

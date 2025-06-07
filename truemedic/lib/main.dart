@@ -13,11 +13,12 @@ import 'screens/auth/doctor_signup_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/home/admin_dashboard_screen.dart';
 import 'screens/home/user_dashboard_screen.dart';
+import 'screens/home/edit_profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await Supabase.initialize(
     url: 'https://zntlbtxvhpyoydqggtgw.supabase.co',
@@ -51,6 +52,9 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/admin-dashboard': (context) => const AdminDashboardScreen(),
         '/user-dashboard': (context) => const UserDashboardScreen(),
+        '/edit-profile': (context) => EditProfileScreen(
+          userProfile: ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>,
+        ),
       },
     );
   }
