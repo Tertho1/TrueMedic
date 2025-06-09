@@ -207,49 +207,47 @@ class _UserLoginScreenState extends State<UserLoginScreen>
         password: _passwordController.text.trim(),
       );
 
-      if (response.user == null) throw Exception('Login failed');
-      if (response.user?.emailConfirmedAt == null) {
-        throw AuthException('Please verify your email first');
+      if (response.session == null) {
+        throw Exception('Login failed');
       }
 
-      // Get user role from Supabase
-      final userRole = await _getUserRole(response.user!.id);
+      if (mounted) {
+        // Fetch user profile to determine user type
+        final userData = await supabase
+            .from('users')
+            .select()
+            .eq('id', response.user!.id)
+            .maybeSingle();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful!'),
-          duration: Duration(seconds: 5),
-        ),
-      );
-
-      // Navigate based on role
-      if (userRole == 'admin') {
-        Navigator.pushReplacementNamed(context, '/admin-dashboard');
-      } else {
-        Navigator.pushReplacementNamed(context, '/user-dashboard');
+        if (userData != null) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/user-dashboard', (route) => false);
+        } else {
+          // Not a regular user, check if admin
+          final adminData = await supabase
+              .from('admins')
+              .select()
+              .eq('id', response.user!.id)
+              .maybeSingle();
+              
+          if (adminData != null) {
+            Navigator.of(context).pushNamedAndRemoveUntil('/admin-dashboard', (route) => false);
+          } else {
+            // Not an admin, log them out as they don't have a profile
+            await supabase.auth.signOut();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No user profile found for this account')),
+            );
+          }
+        }
       }
-    } on AuthException catch (e) {
-      _handleAuthError(e);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Login failed: ${e.toString()}')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login error: ${e.toString()}')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<String> _getUserRole(String userId) async {
-    try {
-      final response =
-          await supabase.from('users').select('role').eq('id', userId).single();
-
-      return response['role'] ?? 'user';
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error fetching user role: $e')));
-      return 'user';
     }
   }
 

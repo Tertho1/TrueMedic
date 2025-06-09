@@ -56,11 +56,15 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
     try {
       await supabase.auth.signOut();
-      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Logout failed: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error signing out: ${e.toString()}')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoggingOut = false);
     }
