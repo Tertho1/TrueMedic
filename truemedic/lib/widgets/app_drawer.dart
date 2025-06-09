@@ -3,14 +3,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppDrawer extends StatelessWidget {
   final supabase = Supabase.instance.client;
-  
+
   AppDrawer({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     // Check if user is logged in
     final isLoggedIn = supabase.auth.currentSession != null;
-    
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -30,11 +30,7 @@ class AppDrawer extends StatelessWidget {
                 CircleAvatar(
                   radius: 36,
                   backgroundColor: Colors.white,
-                  child: Image.asset(
-                    'assets/logo.jpeg',
-                    width: 60,
-                    height: 60,
-                  ),
+                  child: Image.asset('assets/logo.jpeg', width: 60, height: 60),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -48,7 +44,7 @@ class AppDrawer extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Home option - always visible
           ListTile(
             leading: const Icon(Icons.home),
@@ -58,7 +54,7 @@ class AppDrawer extends StatelessWidget {
               Navigator.pushReplacementNamed(context, '/home');
             },
           ),
-          
+
           // Conditional menu items based on auth state
           if (isLoggedIn) ...[
             // Profile option - only when logged in
@@ -70,7 +66,7 @@ class AppDrawer extends StatelessWidget {
                 _navigateToProfile(context);
               },
             ),
-            
+
             // Logout option - only when logged in
             ListTile(
               leading: const Icon(Icons.logout),
@@ -90,7 +86,7 @@ class AppDrawer extends StatelessWidget {
                 Navigator.pushReplacementNamed(context, '/user-or-doctor');
               },
             ),
-            
+
             // Signup option - only when logged out
             ListTile(
               leading: const Icon(Icons.person_add),
@@ -101,9 +97,9 @@ class AppDrawer extends StatelessWidget {
               },
             ),
           ],
-          
+
           const Divider(),
-          
+
           // About option - always visible
           ListTile(
             leading: const Icon(Icons.info),
@@ -121,7 +117,9 @@ class AppDrawer extends StatelessWidget {
                   height: 50,
                 ),
                 children: [
-                  const Text('TrueMedic helps verify doctor credentials and connect patients with healthcare professionals.'),
+                  const Text(
+                    'TrueMedic helps verify doctor credentials and connect patients with healthcare professionals.',
+                  ),
                 ],
               );
             },
@@ -132,53 +130,69 @@ class AppDrawer extends StatelessWidget {
   }
 
   Future<void> _handleLogout(BuildContext context) async {
+    // Store the navigator context to ensure we're using the right one
+    final navigatorContext = Navigator.of(context);
+
     // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder:
+          (dialogContext) => const Center(child: CircularProgressIndicator()),
     );
-    
+
     try {
+      // Add a small delay to ensure dialog is shown
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Perform the logout
       await supabase.auth.signOut();
-      
-      // Close loading dialog and navigate to welcome screen
-      Navigator.of(context).pop();
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+
+      // Make sure we're still mounted before navigating
+      if (navigatorContext.mounted) {
+        // Close loading dialog
+        navigatorContext.pop();
+
+        // Navigate to welcome screen
+        navigatorContext.pushNamedAndRemoveUntil('/home', (route) => false);
+      }
     } catch (e) {
-      // Close loading dialog
-      Navigator.of(context).pop();
-      
-      // Show error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error signing out: ${e.toString()}')),
-      );
+      print('Logout error: $e'); // Add debug print
+
+      // Make sure we're still mounted before showing error
+      if (navigatorContext.mounted) {
+        // Close loading dialog
+        navigatorContext.pop();
+
+        // Show error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error signing out: ${e.toString()}')),
+        );
+      }
     }
   }
 
   void _navigateToProfile(BuildContext context) async {
     try {
       final userId = supabase.auth.currentUser!.id;
-      
+
       // Check user type to redirect to correct dashboard
-      final userData = await supabase
-          .from('users')
-          .select()
-          .eq('id', userId)
-          .maybeSingle();
-          
+      final userData =
+          await supabase.from('users').select().eq('id', userId).maybeSingle();
+
       if (userData != null) {
         Navigator.pushReplacementNamed(context, '/user-dashboard');
         return;
       }
-      
+
       // Check if doctor
-      final doctorData = await supabase
-          .from('doctors')
-          .select()
-          .eq('id', userId)
-          .maybeSingle();
-          
+      final doctorData =
+          await supabase
+              .from('doctors')
+              .select()
+              .eq('id', userId)
+              .maybeSingle();
+
       if (doctorData != null) {
         Navigator.pushReplacementNamed(context, '/doctor-dashboard');
         return;

@@ -212,7 +212,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
       }
 
       if (mounted) {
-        // Fetch user profile to determine user type
+        // Fetch user profile to determine user role
         final userData =
             await supabase
                 .from('users')
@@ -221,31 +221,32 @@ class _UserLoginScreenState extends State<UserLoginScreen>
                 .maybeSingle();
 
         if (userData != null) {
-          Navigator.of(
-            context,
-          ).pushNamedAndRemoveUntil('/home', (route) => false);
-        } else {
-          // Not a regular user, check if admin
-          final adminData =
-              await supabase
-                  .from('admins')
-                  .select()
-                  .eq('id', response.user!.id)
-                  .maybeSingle();
+          // Check the user's role
+          final role = userData['role'] as String?;
 
-          if (adminData != null) {
+          if (role == 'admin') {
             Navigator.of(
               context,
             ).pushNamedAndRemoveUntil('/admin-dashboard', (route) => false);
-          } else {
-            // Not an admin, log them out as they don't have a profile
-            await supabase.auth.signOut();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('No user profile found for this account'),
-              ),
+          } else if (role == 'doctor') {
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/doctor-dashboard', // You might want to add this route
+              (route) => false,
             );
+          } else {
+            // Regular user
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/home', (route) => false);
           }
+        } else {
+          // No user profile found
+          await supabase.auth.signOut();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No user profile found for this account'),
+            ),
+          );
         }
       }
     } catch (e) {
@@ -282,11 +283,14 @@ class _UserLoginScreenState extends State<UserLoginScreen>
     try {
       await supabase.auth.resetPasswordForEmail(
         _emailController.text.trim(),
-        redirectTo: 'http://localhost:3000/reset-password',
+        redirectTo:
+            'truemedic://reset-password', // This should match your scheme and host
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password reset email sent!')),
+        const SnackBar(
+          content: Text('Password reset email sent! Check your email.'),
+        ),
       );
     } on AuthException catch (e) {
       _handleAuthError(e);

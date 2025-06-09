@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 
 import 'screens/welcome_screen.dart';
 import 'screens/auth/user_or_doctor_screen.dart';
@@ -8,12 +11,13 @@ import 'screens/auth/user_login_screen.dart';
 import 'screens/auth/user_signup_screen.dart';
 import 'screens/auth/doctor_login_screen.dart';
 import 'screens/auth/doctor_signup_screen.dart';
-import 'screens/home/home_screen.dart';
 import 'screens/home/admin_dashboard_screen.dart';
-import 'screens/home/user_dashboard_screen.dart';
 import 'screens/home/edit_profile_screen.dart';
+import 'screens/home/home_screen.dart';
+import 'screens/home/user_dashboard_screen.dart';
 import 'screens/splash_screen.dart'; // Import the splash screen
 import 'screens/auth/auth_state.dart'; // Import the AuthStateListener
+import 'screens/auth/password_reset_screen.dart'; // Import the password reset screen
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,17 +30,60 @@ void main() async {
     debug: false,
   );
 
-
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends StatefulWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final _appLinks = AppLinks();
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    initDeepLinks();
+  }
+
+  Future<void> initDeepLinks() async {
+    // Handle app links when the app is started
+    try {
+      final appLink = await _appLinks.getInitialLink();
+      if (appLink != null) {
+        handleDeepLink(appLink);
+      }
+    } catch (e) {
+      print('Error getting initial app link: $e');
+    }
+
+    // Handle app links while app is running
+    _appLinks.uriLinkStream.listen((uri) {
+      handleDeepLink(uri);
+    });
+  }
+
+  void handleDeepLink(Uri uri) {
+    print('Received deep link: $uri');
+    
+    // Check if this is a password reset link
+    if (uri.scheme == 'truemedic' && uri.host == 'reset-password') {
+      // Navigate to password reset screen
+      Future.delayed(const Duration(milliseconds: 500), () {
+        navigatorKey.currentState?.pushReplacementNamed('/password-reset');
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return AuthStateListener(
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         title: 'TrueMedic',
         theme: ThemeData(
@@ -45,7 +92,8 @@ class MyApp extends StatelessWidget {
         ),
         initialRoute: '/splash', // Changed from '/' to '/splash'
         routes: {
-          '/splash': (context) => const SplashScreen(), // Add splash screen route
+          '/splash':
+              (context) => const SplashScreen(), // Add splash screen route
           '/': (context) => const WelcomeScreen(),
           '/user-or-doctor': (context) => const UserOrDoctorScreen(),
           '/user-login': (context) => const UserLoginScreen(),
@@ -61,6 +109,7 @@ class MyApp extends StatelessWidget {
                     ModalRoute.of(context)?.settings.arguments
                         as Map<String, dynamic>,
               ),
+          '/password-reset': (context) => const PasswordResetScreen(),
           // Add other routes as needed
         },
       ),
