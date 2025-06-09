@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../common_ui.dart';
 import '../loading_indicator.dart';
-import 'edit_profile_screen.dart'; 
+import 'edit_profile_screen.dart';
 import '../../widgets/base_scaffold.dart';
 
 class UserDashboardScreen extends StatefulWidget {
@@ -180,11 +180,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             showBackButton: false,
           ),
           Padding(
-            padding: const EdgeInsets.only(
-              top: 270,
-              left: 20,
-              right: 20,
-            ),
+            padding: const EdgeInsets.only(top: 270, left: 20, right: 20),
             child: Card(
               elevation: 8,
               shape: RoundedRectangleBorder(
