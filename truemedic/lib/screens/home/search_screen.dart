@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase/supabase.dart';
 import 'dart:convert';
-import '../loading_indicator.dart';
+
 
 class SearchResultScreen extends StatefulWidget {
   final Doctor doctor;

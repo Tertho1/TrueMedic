@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../common_ui.dart';
 import '../loading_indicator.dart';
-import 'edit_profile_screen.dart'; // Import the EditProfileScreen
+import 'edit_profile_screen.dart'; 
+import '../../widgets/base_scaffold.dart';
 
 class UserDashboardScreen extends StatefulWidget {
   const UserDashboardScreen({super.key});
@@ -158,16 +159,16 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('User Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _isLoggingOut ? null : _logout,
-          ),
-        ],
-      ),
+    return BaseScaffold(
+      title: 'User Dashboard',
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications),
+          onPressed: () {
+            // Handle notifications
+          },
+        ),
+      ],
       body: Stack(
         children: [
           const TopClippedDesign(
@@ -183,7 +184,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               top: 270,
               left: 20,
               right: 20,
-            ), // Increased from 150 to 220
+            ),
             child: Card(
               elevation: 8,
               shape: RoundedRectangleBorder(
@@ -200,11 +201,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           ),
           if (_isLoggingOut) const LoadingIndicator(),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _fetchUserProfile,
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.refresh, color: Colors.white),
       ),
     );
   }

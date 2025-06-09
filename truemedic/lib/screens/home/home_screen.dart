@@ -8,6 +8,7 @@ import 'package:supabase/supabase.dart';
 import 'search_screen.dart';
 import '../common_ui.dart';
 import '../loading_indicator.dart';
+import '../../widgets/base_scaffold.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -536,7 +537,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BaseScaffold(
+      title: 'TrueMedic',
       body: SizedBox.expand(
         child: Stack(
           children: [

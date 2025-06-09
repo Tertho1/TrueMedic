@@ -213,38 +213,46 @@ class _UserLoginScreenState extends State<UserLoginScreen>
 
       if (mounted) {
         // Fetch user profile to determine user type
-        final userData = await supabase
-            .from('users')
-            .select()
-            .eq('id', response.user!.id)
-            .maybeSingle();
+        final userData =
+            await supabase
+                .from('users')
+                .select()
+                .eq('id', response.user!.id)
+                .maybeSingle();
 
         if (userData != null) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/user-dashboard', (route) => false);
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/home', (route) => false);
         } else {
           // Not a regular user, check if admin
-          final adminData = await supabase
-              .from('admins')
-              .select()
-              .eq('id', response.user!.id)
-              .maybeSingle();
-              
+          final adminData =
+              await supabase
+                  .from('admins')
+                  .select()
+                  .eq('id', response.user!.id)
+                  .maybeSingle();
+
           if (adminData != null) {
-            Navigator.of(context).pushNamedAndRemoveUntil('/admin-dashboard', (route) => false);
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/admin-dashboard', (route) => false);
           } else {
             // Not an admin, log them out as they don't have a profile
             await supabase.auth.signOut();
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No user profile found for this account')),
+              const SnackBar(
+                content: Text('No user profile found for this account'),
+              ),
             );
           }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login error: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Login error: ${e.toString()}')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
