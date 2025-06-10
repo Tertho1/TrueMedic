@@ -3,6 +3,7 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 
 
 import 'screens/welcome_screen.dart';
@@ -18,6 +19,8 @@ import 'screens/home/user_dashboard_screen.dart';
 import 'screens/splash_screen.dart'; // Import the splash screen
 import 'screens/auth/auth_state.dart'; // Import the AuthStateListener
 import 'screens/auth/password_reset_screen.dart'; // Import the password reset screen
+import 'screens/auth/verification_pending_screen.dart'; // Import the verification pending screen
+import 'screens/home/doctor_verification_screen.dart'; // Import the doctor verification screen
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -110,7 +113,10 @@ class _MyAppState extends State<MyApp> {
                         as Map<String, dynamic>,
               ),
           '/password-reset': (context) => const PasswordResetScreen(),
+          '/verification-pending':
+              (context) => const VerificationPendingScreen(),
           // Add other routes as needed
+          
         },
       ),
     );

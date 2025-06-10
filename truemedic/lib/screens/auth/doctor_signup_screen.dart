@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+// import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -42,6 +43,11 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   final _motherNameController = TextEditingController();
   final _bloodGroupController = TextEditingController();
   final _birthYearController = TextEditingController();
+
+  // Add these after your other variables
+  File? _certificateFile;
+  Uint8List? _certificateBytes;
+  bool _isCertificateUploading = false;
 
   final supabase = Supabase.instance.client;
 
@@ -118,16 +124,16 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
 
       if (kIsWeb) {
         await supabase.storage
-            .from('verification_images')
+            .from('verification-images')
             .uploadBinary(filePath, _selectedImageBytes!);
       } else {
         await supabase.storage
-            .from('verification_images')
+            .from('verification-images')
             .upload(filePath, _selectedImage!);
       }
 
       return supabase.storage
-          .from('verification_images')
+          .from('verification-images')
           .getPublicUrl(filePath);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -252,6 +258,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Check required fields
     if (_doctorType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select doctor type')),
@@ -259,9 +266,16 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
       return;
     }
 
-    if (_selectedImage == null) {
+    if (_selectedImage == null && _selectedImageBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please upload a verification image')),
+      );
+      return;
+    }
+
+    if (_certificateFile == null && _certificateBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload your medical certificate')),
       );
       return;
     }
@@ -273,34 +287,66 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
       return;
     }
 
-    final captchaText = await _showCaptchaDialog();
-    if (captchaText == null || captchaText.isEmpty) return;
-
-    final isValid = await _verifyAndCompareData(captchaText);
-
-    if (!isValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Information mismatch with BMDC records')),
-      );
-      return;
-    }
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
 
     try {
-      // Upload image first
-      final imageUrl = await _uploadImage();
-      if (imageUrl == null) return;
+      // Verify BMDC information
+      final captchaText = await _showCaptchaDialog();
+      if (captchaText == null || captchaText.isEmpty) {
+        Navigator.pop(context); // Close loading dialog
+        return;
+      }
 
-      // Create user with Supabase Auth
+      final isValid = await _verifyAndCompareData(captchaText);
+      if (!isValid) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Information mismatch with BMDC records'),
+          ),
+        );
+        return;
+      }
+
+      // 1. FIRST, create user with Supabase Auth
       final authResponse = await supabase.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
+        data: {'role': 'doctor_unverified'},
+        emailRedirectTo: null,
       );
 
       if (authResponse.user == null) {
         throw Exception('User creation failed');
       }
 
-      // Insert doctor data
+      // Add user data to users table
+      await supabase.from('users').insert({
+        'id': authResponse.user!.id,
+        'full_name': _fullNameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'phone_number': _phoneNumberController.text.trim(),
+        'role': 'doctor_unverified',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // 2. THEN, upload verification files (now user is authenticated)
+      final imageUrl = await _uploadImage();
+      final certificateUrl = await _uploadCertificate();
+
+      if (imageUrl == null || certificateUrl == null) {
+        // If uploads fail, delete the created user
+        await supabase.auth.admin.deleteUser(authResponse.user!.id);
+        Navigator.pop(context); // Close loading dialog
+        return;
+      }
+
+      // 3. FINALLY, insert doctor data
       await supabase.from('doctors').insert({
         'id': authResponse.user!.id,
         'full_name': _fullNameController.text.trim(),
@@ -312,25 +358,81 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
         'mother_name': _motherNameController.text.trim(),
         'blood_group': _bloodGroupController.text.trim().toUpperCase(),
         'birth_year': _birthYearController.text.trim(),
-        'verification_image_url': imageUrl, // Store the image URL
+        'verification_image_url': imageUrl,
+        'certificate_url': certificateUrl,
         'verified': false,
         'verification_pending': true,
         'created_at': DateTime.now().toIso8601String(),
       });
 
+      // Close loading dialog and navigate
+      Navigator.pop(context);
       Navigator.pushReplacementNamed(context, '/verification-pending');
     } on AuthException catch (e) {
+      Navigator.pop(context); // Close loading dialog
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Authentication error: ${e.message}')),
       );
     } on PostgrestException catch (e) {
+      Navigator.pop(context); // Close loading dialog
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Database error: ${e.message}')));
     } catch (e) {
+      Navigator.pop(context); // Close loading dialog
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+    }
+  }
+
+  Future<void> _pickCertificate() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile == null) return;
+
+    if (kIsWeb) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        _certificateBytes = bytes;
+        _certificateFile = null;
+      });
+    } else {
+      setState(() {
+        _certificateFile = File(pickedFile.path);
+        _certificateBytes = null;
+      });
+    }
+  }
+
+  Future<String?> _uploadCertificate() async {
+    if (_certificateFile == null && _certificateBytes == null) return null;
+
+    setState(() => _isCertificateUploading = true);
+    try {
+      final fileExt = kIsWeb ? 'jpg' : _certificateFile!.path.split('.').last;
+      final fileName = 'cert_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final filePath = 'doctor_certification/$fileName';
+
+      if (kIsWeb) {
+        await supabase.storage
+            .from('doctor-certificates')
+            .uploadBinary(filePath, _certificateBytes!);
+      } else {
+        await supabase.storage
+            .from('doctor-certificates')
+            .upload(filePath, _certificateFile!);
+      }
+
+      return supabase.storage
+          .from('doctor-certificates')
+          .getPublicUrl(filePath);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Certificate upload failed: ${e.toString()}')),
+      );
+      return null;
+    } finally {
+      setState(() => _isCertificateUploading = false);
     }
   }
 
@@ -466,7 +568,71 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
                                 const LinearProgressIndicator(),
                             ],
                           ),
-                          // [Rest of your form fields remain the same]
+                          // Certificate Upload
+                          const SizedBox(height: 15),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Medical Certificate (PDF/Image)',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: _pickCertificate,
+                                child: Container(
+                                  width: double.infinity,
+                                  height:
+                                      150, // Match the height of the verification image
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child:
+                                      (_certificateFile != null ||
+                                              _certificateBytes != null)
+                                          ? const Center(
+                                            child: Icon(
+                                              Icons.description,
+                                              size: 50,
+                                              color: Colors.teal,
+                                            ),
+                                          )
+                                          : Center(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.upload_file,
+                                                  size: 40,
+                                                  color: Colors.grey,
+                                                ),
+                                                Text(
+                                                  'Tap to upload certificate',
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                ),
+                              ),
+                              if (_certificateFile != null ||
+                                  _certificateBytes != null)
+                                TextButton(
+                                  onPressed: _pickCertificate,
+                                  child: const Text("Change Certificate"),
+                                ),
+                              if (_isCertificateUploading)
+                                const LinearProgressIndicator(),
+                            ],
+                          ),
+
                           const SizedBox(height: 15),
                           _buildTextField("Full Name", _fullNameController),
                           const SizedBox(height: 15),
