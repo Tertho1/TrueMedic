@@ -247,11 +247,12 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
       }
 
       // Check doctor verification status
-      final doctorData = await supabase
-          .from('doctors')
-          .select()
-          .eq('id', response.user!.id)
-          .maybeSingle();
+      final doctorData =
+          await supabase
+              .from('doctors')
+              .select()
+              .eq('id', response.user!.id)
+              .maybeSingle();
 
       if (doctorData == null) {
         throw Exception('Doctor profile not found');
@@ -261,15 +262,15 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
       Navigator.pushReplacementNamed(context, '/doctor-dashboard');
     } on AuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login error: ${e.message}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Login error: ${e.message}')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login error: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Login error: ${e.toString()}')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

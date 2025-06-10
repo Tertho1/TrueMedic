@@ -9,7 +9,7 @@ class DoctorVerificationScreen extends StatefulWidget {
   final bool readOnly;
 
   const DoctorVerificationScreen({
-    Key? key, 
+    Key? key,
     required this.doctor,
     this.readOnly = false,
   }) : super(key: key);
@@ -46,7 +46,7 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
           })
           .eq('id', widget.doctor['id']);
 
-      // Update user role to 'doctor'
+      // UPDATE USER ROLE TO DOCTOR - This is what was missing
       await supabase
           .from('users')
           .update({'role': 'doctor'})
@@ -61,7 +61,7 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
       Navigator.pop(context, true); // Return true to refresh list
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error approving doctor: ${e.toString()}')),
+        SnackBar(content: Text('Error: ${e.toString()}')),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -347,11 +347,11 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.readOnly 
+          widget.readOnly
               ? widget.doctor['rejected'] == true
                   ? 'Rejected Application'
                   : 'Verified Doctor'
-              : 'Doctor Verification'
+              : 'Doctor Verification',
         ),
       ),
       body:
@@ -768,39 +768,43 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
                     const SizedBox(height: 32),
 
                     // Action Buttons
-                    widget.readOnly 
+                    widget.readOnly
                         ? Container() // No buttons in read-only mode
                         : Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: _approveDoctor,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                  ),
-                                  child: const Text(
-                                    'APPROVE',
-                                    style: TextStyle(color: Colors.white),
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _approveDoctor,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: _showRejectDialog,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                  ),
-                                  child: const Text(
-                                    'REJECT',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
+                                child: const Text(
+                                  'APPROVE',
+                                  style: TextStyle(color: Colors.white),
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _showRejectDialog,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'REJECT',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                   ],
                 ),
               ),

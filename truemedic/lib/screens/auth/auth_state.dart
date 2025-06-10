@@ -22,13 +22,13 @@ class _AuthStateListenerState extends State<AuthStateListener> {
       final event = data.event;
       if (event == AuthChangeEvent.signedOut) {
         // Handle sign out (e.g., clear cache)
-        print('User signed out');
+        // print('User signed out');
       } else if (event == AuthChangeEvent.signedIn) {
         // Handle sign in
-        print('User signed in: ${data.session?.user.id}');
+        // print('User signed in: ${data.session?.user.id}');
       } else if (event == AuthChangeEvent.tokenRefreshed) {
         // Handle token refresh
-        print('Token refreshed');
+        // print('Token refreshed');
       }
     });
   }

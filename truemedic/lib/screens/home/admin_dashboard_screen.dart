@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../widgets/base_scaffold.dart';
-import '../loading_indicator.dart';
+// import '../loading_indicator.dart';
 import 'doctor_verification_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -110,9 +110,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildDoctorsList(_pendingDoctors, isPending: true),
-                _buildDoctorsList(_verifiedDoctors),
-                _buildDoctorsList(_rejectedDoctors, isRejected: true),
+                // Individual RefreshIndicator for each tab
+                _buildRefreshableList(_pendingDoctors, isPending: true),
+                _buildRefreshableList(_verifiedDoctors),
+                _buildRefreshableList(_rejectedDoctors, isRejected: true),
               ],
             ),
           ),
@@ -121,96 +122,130 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 
-  // Improved list builder that works for all three types
-  Widget _buildDoctorsList(
+  // New helper method to create refreshable lists
+  Widget _buildRefreshableList(
     List<Map<String, dynamic>> doctors, {
     bool isPending = false,
     bool isRejected = false,
   }) {
-    if (doctors.isEmpty) {
-      return Center(
-        child: Text(
-          isPending
-              ? 'No pending doctor applications'
-              : isRejected
-              ? 'No rejected applications'
-              : 'No verified doctors',
-          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-        ),
-      );
-    }
-
     return RefreshIndicator(
       onRefresh: _fetchAllDoctors,
-      child: ListView.builder(
-        itemCount: doctors.length,
-        padding: const EdgeInsets.all(16),
-        itemBuilder: (context, index) {
-          final doctor = doctors[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor:
-                    isPending
-                        ? Colors.amber
-                        : isRejected
-                        ? Colors.red
-                        : Colors.green,
-                child: Icon(
-                  isPending
-                      ? Icons.pending
-                      : isRejected
-                      ? Icons.cancel
-                      : Icons.check,
-                  color: Colors.white,
-                ),
-              ),
-              title: Text(doctor['full_name'] ?? 'Unknown'),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child:
+          doctors.isEmpty
+              ? ListView(
+                // Important: This makes the RefreshIndicator work even when the list is empty
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: [
-                  Text('BMDC: ${doctor['bmdc_number']}'),
-                  Text('Type: ${doctor['doctor_type'] ?? 'N/A'}'),
-                  if (isRejected && doctor['rejection_reason'] != null)
-                    Text(
-                      'Reason: ${doctor['rejection_reason']}',
-                      style: const TextStyle(color: Colors.red),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 50),
+                      child: Text(
+                        isPending
+                            ? 'No pending doctor applications'
+                            : isRejected
+                            ? 'No rejected applications'
+                            : 'No verified doctors',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
                     ),
+                  ),
                 ],
-              ),
-              trailing:
-                  isPending
-                      ? ElevatedButton(
-                        onPressed: () => _navigateToVerification(doctor),
-                        child: const Text('Verify'),
-                      )
-                      : isRejected
-                      ? ElevatedButton(
-                        onPressed: () => _allowResubmission(doctor),
-                        child: const Text('Allow Resubmit'),
-                      )
-                      : Row(
-                        // For verified doctors
-                        mainAxisSize: MainAxisSize.min,
+              )
+              : ListView.builder(
+                itemCount: doctors.length,
+                padding: const EdgeInsets.all(16),
+                // Important: This makes the RefreshIndicator work when content doesn't fill screen
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemBuilder: (context, index) {
+                  final doctor = doctors[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor:
+                            isPending
+                                ? Colors.amber
+                                : isRejected
+                                ? Colors.red
+                                : Colors.green,
+                        child: Icon(
+                          isPending
+                              ? Icons.pending
+                              : isRejected
+                              ? Icons.cancel
+                              : Icons.check,
+                          color: Colors.white,
+                        ),
+                      ),
+                      title: Text(doctor['full_name'] ?? 'Unknown',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.remove_circle_outline,
-                              color: Colors.red,
+                          Text('BMDC: ${doctor['bmdc_number']}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade700,
+                          ),),
+                          Text('Type: ${doctor['doctor_type'] ?? 'N/A'}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade700,
+                          ),),
+                          if (isRejected && doctor['rejection_reason'] != null)
+                            Text(
+                              'Reason: ${doctor['rejection_reason']}',
+                              style: const TextStyle(color: Colors.red),
                             ),
-                            tooltip: 'Revoke Verification',
-                            onPressed: () => _confirmRevokeVerification(doctor),
-                          ),
-                          const Icon(Icons.check_circle, color: Colors.green),
                         ],
                       ),
-              onTap:
-                  () => _navigateToVerification(doctor, readOnly: !isPending),
-            ),
-          );
-        },
-      ),
+                      trailing:
+                          isPending
+                              ? ElevatedButton(
+                                onPressed:
+                                    () => _navigateToVerification(doctor),
+                                child: const Text('Verify'),
+                              )
+                              : isRejected
+                              ? ElevatedButton(
+                                onPressed: () => _allowResubmission(doctor),
+                                child: const Text('Allow Resubmit'),
+                              )
+                              : Row(
+                                // For verified doctors
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                      color: Colors.red,
+                                    ),
+                                    tooltip: 'Revoke Verification',
+                                    onPressed:
+                                        () =>
+                                            _confirmRevokeVerification(doctor),
+                                  ),
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                  ),
+                                ],
+                              ),
+                      onTap:
+                          () => _navigateToVerification(
+                            doctor,
+                            readOnly: !isPending,
+                          ),
+                    ),
+                  );
+                },
+              ),
     );
   }
 
@@ -233,9 +268,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
       _fetchAllDoctors(); // Refresh the lists
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
   }
 
@@ -307,6 +342,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             'verification_pending': true,
             'verified_at': null,
           })
+          .eq('id', doctor['id']);
+
+      // Add this - Change role to unverified when moving back to pending
+      await supabase
+          .from('users')
+          .update({'role': 'doctor_unverified'})
           .eq('id', doctor['id']);
 
       ScaffoldMessenger.of(context).showSnackBar(
