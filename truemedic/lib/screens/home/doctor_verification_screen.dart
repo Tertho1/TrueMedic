@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../loading_indicator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DoctorVerificationScreen extends StatefulWidget {
   final Map<String, dynamic> doctor;
@@ -131,6 +133,158 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
     );
   }
 
+  void _showBmdcImageFullscreen(BuildContext context) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => Dialog(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppBar(
+                  title: const Text('BMDC Official Photo'),
+                  centerTitle: true,
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.file_download),
+                      onPressed: () {
+                        // Future enhancement: Add download functionality
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Download not implemented'),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                Flexible(
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Image.memory(
+                      base64Decode(widget.doctor['bmdc_image_base64']),
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+    );
+  }
+
+  void _showVerificationImageFullscreen(BuildContext context) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => Dialog(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppBar(
+                  title: const Text('Verification Image'),
+                  centerTitle: true,
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.file_download),
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Download not implemented'),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                Flexible(
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Image.network(
+                      widget.doctor['verification_image_url'],
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(child: CircularProgressIndicator());
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+    );
+  }
+
+  void _showCertificateFullscreen(BuildContext context) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => Dialog(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppBar(
+                  title: const Text('Medical Certificate'),
+                  centerTitle: true,
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.file_download),
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Download not implemented'),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                Flexible(
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Image.network(
+                      widget.doctor['certificate_url'],
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(child: CircularProgressIndicator());
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+    );
+  }
+
+  // Optional: Add this method to check if the certificate is an image
+  bool _isImageCertificate(String url) {
+    final lowerUrl = url.toLowerCase();
+    return lowerUrl.endsWith('.jpg') ||
+        lowerUrl.endsWith('.jpeg') ||
+        lowerUrl.endsWith('.png');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -149,6 +303,64 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // BMDC Image Section
+                            if (widget.doctor['bmdc_image_base64'] != null &&
+                                widget.doctor['bmdc_image_base64']
+                                    .toString()
+                                    .isNotEmpty)
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Center(
+                                    child: Container(
+                                      height: 150,
+                                      width: 150,
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: Colors.blue.shade300,
+                                          width: 2,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Image.memory(
+                                          base64Decode(
+                                            widget.doctor['bmdc_image_base64'],
+                                          ),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (
+                                            context,
+                                            error,
+                                            stackTrace,
+                                          ) {
+                                            print(
+                                              'Error loading BMDC image: $error',
+                                            );
+                                            return const Center(
+                                              child: Text(
+                                                'Could not load BMDC image',
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.fullscreen),
+                                    label: const Text('View BMDC Photo'),
+                                    onPressed:
+                                        () => _showBmdcImageFullscreen(context),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Divider(),
+                                  const SizedBox(height: 8),
+                                ],
+                              ),
+
+                            // Doctor Info (existing code)
                             Text(
                               widget.doctor['full_name'] ?? 'Unknown',
                               style: const TextStyle(
@@ -211,24 +423,108 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              if (widget.doctor['verification_image_url'] !=
-                                  null)
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    widget.doctor['verification_image_url'],
-                                    height: 200,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            const Center(
-                                              child: Text(
-                                                'Failed to load image',
-                                              ),
-                                            ),
+                              Container(
+                                height: 200,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
                                   ),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child:
+                                          widget.doctor['verification_image_url'] !=
+                                                  null
+                                              ? ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                child: Image.network(
+                                                  widget
+                                                      .doctor['verification_image_url'],
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder:
+                                                      (
+                                                        context,
+                                                        error,
+                                                        stackTrace,
+                                                      ) => const Center(
+                                                        child: Text(
+                                                          'Failed to load image',
+                                                        ),
+                                                      ),
+                                                ),
+                                              )
+                                              : const Center(
+                                                child: Text(
+                                                  'No image uploaded',
+                                                ),
+                                              ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            icon: const Icon(Icons.fullscreen),
+                                            label: const Text(''),
+                                            onPressed:
+                                                widget.doctor['verification_image_url'] !=
+                                                        null
+                                                    ? () =>
+                                                        _showVerificationImageFullscreen(
+                                                          context,
+                                                        )
+                                                    : null,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            icon: const Icon(Icons.open_in_new),
+                                            label: const Text(''),
+                                            onPressed:
+                                                widget.doctor['verification_image_url'] !=
+                                                        null
+                                                    ? () async {
+                                                      final url = Uri.parse(
+                                                        widget
+                                                            .doctor['verification_image_url'],
+                                                      );
+                                                      if (await canLaunchUrl(
+                                                        url,
+                                                      )) {
+                                                        await launchUrl(
+                                                          url,
+                                                          mode:
+                                                              LaunchMode
+                                                                  .externalApplication,
+                                                        );
+                                                      } else {
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Could not open image',
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                    }
+                                                    : null,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -245,34 +541,141 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              if (widget.doctor['certificate_url'] != null)
-                                Container(
-                                  height: 200,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: Colors.grey.shade300,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
+                              Container(
+                                height: 200,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
                                   ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.description,
-                                        size: 50,
-                                        color: Colors.teal,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      TextButton(
-                                        onPressed: () {
-                                          // Open certificate in browser
-                                          // launchUrl(Uri.parse(widget.doctor['certificate_url']));
-                                        },
-                                        child: const Text('View Certificate'),
-                                      ),
-                                    ],
-                                  ),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child:
+                                          widget.doctor['certificate_url'] !=
+                                                  null
+                                              ? Image.network(
+                                                widget
+                                                    .doctor['certificate_url'],
+                                                fit: BoxFit.contain,
+                                                errorBuilder: (
+                                                  context,
+                                                  error,
+                                                  stackTrace,
+                                                ) {
+                                                  print(
+                                                    'Error loading certificate: $error',
+                                                  );
+                                                  return Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      Icon(
+                                                        Icons
+                                                            .image_not_supported,
+                                                        size: 50,
+                                                        color: Colors.red,
+                                                      ),
+                                                      const SizedBox(height: 8),
+                                                      const Text(
+                                                        'Could not load certificate image',
+                                                      ),
+                                                    ],
+                                                  );
+                                                },
+                                                loadingBuilder: (
+                                                  context,
+                                                  child,
+                                                  loadingProgress,
+                                                ) {
+                                                  if (loadingProgress == null)
+                                                    return child;
+                                                  return Center(
+                                                    child: CircularProgressIndicator(
+                                                      value:
+                                                          loadingProgress
+                                                                      .expectedTotalBytes !=
+                                                                  null
+                                                              ? loadingProgress
+                                                                      .cumulativeBytesLoaded /
+                                                                  loadingProgress
+                                                                      .expectedTotalBytes!
+                                                              : null,
+                                                    ),
+                                                  );
+                                                },
+                                              )
+                                              : const Center(
+                                                child: Text(
+                                                  'No certificate uploaded',
+                                                ),
+                                              ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            icon: const Icon(Icons.fullscreen),
+                                            label: const Text(''),
+                                            onPressed:
+                                                widget.doctor['certificate_url'] !=
+                                                        null
+                                                    ? () =>
+                                                        _showCertificateFullscreen(
+                                                          context,
+                                                        )
+                                                    : null,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            icon: const Icon(Icons.open_in_new),
+                                            label: const Text(''),
+                                            onPressed:
+                                                widget.doctor['certificate_url'] !=
+                                                        null
+                                                    ? () async {
+                                                      final url = Uri.parse(
+                                                        widget
+                                                            .doctor['certificate_url'],
+                                                      );
+                                                      if (await canLaunchUrl(
+                                                        url,
+                                                      )) {
+                                                        await launchUrl(
+                                                          url,
+                                                          mode:
+                                                              LaunchMode
+                                                                  .externalApplication,
+                                                        );
+                                                      } else {
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Could not open certificate',
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                    }
+                                                    : null,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),

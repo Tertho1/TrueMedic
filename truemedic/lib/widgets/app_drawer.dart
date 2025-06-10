@@ -177,21 +177,29 @@ class AppDrawer extends StatelessWidget {
       final userId = supabase.auth.currentUser!.id;
 
       // Check user type to redirect to correct dashboard
-      final userData =
-          await supabase.from('users').select().eq('id', userId).maybeSingle();
+      final userData = await supabase
+          .from('users')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
 
       if (userData != null) {
+        // Check if admin role
+        if (userData['role'] == 'admin') {
+          Navigator.pushReplacementNamed(context, '/admin-dashboard');
+          return;
+        }
+
         Navigator.pushReplacementNamed(context, '/user-dashboard');
         return;
       }
 
       // Check if doctor
-      final doctorData =
-          await supabase
-              .from('doctors')
-              .select()
-              .eq('id', userId)
-              .maybeSingle();
+      final doctorData = await supabase
+          .from('doctors')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
 
       if (doctorData != null) {
         Navigator.pushReplacementNamed(context, '/doctor-dashboard');

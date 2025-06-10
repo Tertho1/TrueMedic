@@ -22,6 +22,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _checkAdminRole();
     _fetchPendingDoctors();
   }
 
@@ -35,6 +36,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     setState(() => _isLoading = true);
 
     try {
+      // First, check if we can read any doctors at all
+      final allDoctors = await supabase.from('doctors').select();
+      print('Total doctors in database: ${allDoctors.length}');
+
+      // Then run the filtered query
       final response = await supabase
           .from('doctors')
           .select()
@@ -43,18 +49,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           .eq('rejected', false)
           .order('created_at');
 
+      print('Pending doctors found: ${response.length}');
+      print('Response data: $response');
+
       setState(() {
         _pendingDoctors = List<Map<String, dynamic>>.from(response);
       });
     } catch (e) {
+      print('Error fetching doctors: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error loading pending verifications: ${e.toString()}'),
+          content: Text('Error: ${e.toString()}'),
+          duration: const Duration(seconds: 10),
         ),
       );
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _checkAdminRole() async {
+    final session = supabase.auth.currentSession;
+    if (session == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Not authenticated - please log in')),
+      );
+      return;
+    }
+
+    // Print the JWT role to debug
+    final userRole = session.user.userMetadata?['role'];
+    print('Current user role from metadata: $userRole');
+
+    // Check if role is in the JWT claims
+    final jwtRole = session.accessToken;
+    print('JWT payload: $jwtRole');
   }
 
   @override

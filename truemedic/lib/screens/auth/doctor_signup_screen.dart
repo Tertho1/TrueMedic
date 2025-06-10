@@ -49,6 +49,8 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   Uint8List? _certificateBytes;
   bool _isCertificateUploading = false;
 
+  String? _bmdcImageBase64;
+
   final supabase = Supabase.instance.client;
 
   @override
@@ -227,6 +229,12 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
 
       if (response.statusCode == 200) {
         final apiData = json.decode(response.body);
+
+        // Store the BMDC image base64 string
+        // Store the BMDC image base64 string directly
+        _bmdcImageBase64 =
+            apiData['doctor_image_base64'] ?? apiData['image_base64'] ?? '';
+
         return _validateAllInfo(apiData);
       }
       return false;
@@ -360,6 +368,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
         'birth_year': _birthYearController.text.trim(),
         'verification_image_url': imageUrl,
         'certificate_url': certificateUrl,
+        'bmdc_image_base64': _bmdcImageBase64, // Add this line
         'verified': false,
         'verification_pending': true,
         'created_at': DateTime.now().toIso8601String(),
