@@ -43,10 +43,10 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
           .eq('id', widget.doctor['id']);
 
       // Update user role to 'doctor'
-      await supabase.auth.admin.updateUserById(
-        widget.doctor['id'],
-        attributes: AdminUserAttributes(userMetadata: {'role': 'doctor'}),
-      );
+      await supabase
+          .from('users')
+          .update({'role': 'doctor'})
+          .eq('id', widget.doctor['id']);
 
       // Send email notification to doctor (implement this with email service)
 
@@ -134,144 +134,197 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
   }
 
   void _showBmdcImageFullscreen(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
     showDialog(
       context: context,
       builder:
           (context) => Dialog(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppBar(
-                  title: const Text('BMDC Official Photo'),
-                  centerTitle: true,
-                  leading: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.file_download),
-                      onPressed: () {
-                        // Future enhancement: Add download functionality
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Download not implemented'),
-                          ),
-                        );
-                      },
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: screenSize.width * 0.03, // 5% margin on each side
+              vertical: 20,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Container(
+              width: screenSize.width * .95, // 90% of screen width
+              constraints: BoxConstraints(
+                maxHeight: screenSize.height * 0.8, // 80% of screen height max
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppBar(
+                    title: const Text('BMDC Official Photo'),
+                    centerTitle: true,
+                    leading: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                  ],
-                ),
-                Flexible(
-                  child: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    child: Image.memory(
-                      base64Decode(widget.doctor['bmdc_image_base64']),
-                      fit: BoxFit.contain,
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.file_download),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Download not implemented'),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  Flexible(
+                    child: InteractiveViewer(
+                      minScale: 0.5,
+                      maxScale: 4.0,
+                      child: Image.memory(
+                        base64Decode(widget.doctor['bmdc_image_base64']),
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                ],
+              ),
             ),
           ),
     );
   }
 
   void _showVerificationImageFullscreen(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
     showDialog(
       context: context,
       builder:
           (context) => Dialog(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppBar(
-                  title: const Text('Verification Image'),
-                  centerTitle: true,
-                  leading: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.file_download),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Download not implemented'),
-                          ),
-                        );
-                      },
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: screenSize.width * 0.03,
+              vertical: 20,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Container(
+              width: screenSize.width * 0.95,
+              constraints: BoxConstraints(maxHeight: screenSize.height * 0.8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppBar(
+                    title: const Text('Verification Image'),
+                    centerTitle: true,
+                    leading: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                  ],
-                ),
-                Flexible(
-                  child: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    child: Image.network(
-                      widget.doctor['verification_image_url'],
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(child: CircularProgressIndicator());
-                      },
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.file_download),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Download not implemented'),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  Flexible(
+                    child: InteractiveViewer(
+                      minScale: 0.5,
+                      maxScale: 4.0,
+                      child: Image.network(
+                        widget.doctor['verification_image_url'],
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value:
+                                  loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                ],
+              ),
             ),
           ),
     );
   }
 
   void _showCertificateFullscreen(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
     showDialog(
       context: context,
       builder:
           (context) => Dialog(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppBar(
-                  title: const Text('Medical Certificate'),
-                  centerTitle: true,
-                  leading: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.file_download),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Download not implemented'),
-                          ),
-                        );
-                      },
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: screenSize.width * 0.03,
+              vertical: 20,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Container(
+              width: screenSize.width * 0.95,
+              constraints: BoxConstraints(maxHeight: screenSize.height * 0.8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppBar(
+                    title: const Text('Medical Certificate'),
+                    centerTitle: true,
+                    leading: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                  ],
-                ),
-                Flexible(
-                  child: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    child: Image.network(
-                      widget.doctor['certificate_url'],
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(child: CircularProgressIndicator());
-                      },
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.file_download),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Download not implemented'),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  Flexible(
+                    child: InteractiveViewer(
+                      minScale: 0.5,
+                      maxScale: 4.0,
+                      child: Image.network(
+                        widget.doctor['certificate_url'],
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value:
+                                  loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                ],
+              ),
             ),
           ),
     );

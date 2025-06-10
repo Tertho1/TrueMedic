@@ -16,6 +16,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   final supabase = Supabase.instance.client;
   bool _isLoading = true;
   List<Map<String, dynamic>> _pendingDoctors = [];
+  List<Map<String, dynamic>> _verifiedDoctors = []; // Add this
+  List<Map<String, dynamic>> _rejectedDoctors = []; // Add this
   late TabController _tabController;
 
   @override
@@ -37,8 +39,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
     try {
       // First, check if we can read any doctors at all
-      final allDoctors = await supabase.from('doctors').select();
-      print('Total doctors in database: ${allDoctors.length}');
+      // final allDoctors = await supabase.from('doctors').select();
+      // print('Total doctors in database: ${allDoctors.length}');
 
       // Then run the filtered query
       final response = await supabase
@@ -49,8 +51,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           .eq('rejected', false)
           .order('created_at');
 
-      print('Pending doctors found: ${response.length}');
-      print('Response data: $response');
+      // print('Pending doctors found: ${response.length}');
+      // print('Response data: $response');
 
       setState(() {
         _pendingDoctors = List<Map<String, dynamic>>.from(response);
@@ -82,8 +84,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     print('Current user role from metadata: $userRole');
 
     // Check if role is in the JWT claims
-    final jwtRole = session.accessToken;
-    print('JWT payload: $jwtRole');
+    // final jwtRole = session.accessToken;
+    // print('JWT payload: $jwtRole');
   }
 
   @override
