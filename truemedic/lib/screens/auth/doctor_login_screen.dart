@@ -247,56 +247,29 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
       }
 
       // Check doctor verification status
-      final doctorData =
-          await supabase
-              .from('doctors')
-              .select()
-              .eq('id', response.user!.id)
-              .maybeSingle();
+      final doctorData = await supabase
+          .from('doctors')
+          .select()
+          .eq('id', response.user!.id)
+          .maybeSingle();
 
       if (doctorData == null) {
         throw Exception('Doctor profile not found');
       }
 
-      if (doctorData['rejected'] == true) {
-        // Doctor was rejected
-        final reason = doctorData['rejection_reason'] ?? 'No reason provided';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Your application was rejected: $reason')),
-        );
-        await supabase.auth.signOut(); // Sign them out
-        return;
-      }
-
-      if (doctorData['verification_pending'] == true) {
-        // Doctor is still pending verification
-        Navigator.pushReplacementNamed(context, '/verification-pending');
-        return;
-      }
-
-      if (doctorData['verified'] == true) {
-        // Doctor is verified, proceed to dashboard
-        Navigator.pushReplacementNamed(context, '/doctor-dashboard');
-        return;
-      }
-
-      // Unexpected state
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account status unclear. Please contact support.'),
-        ),
-      );
+      // CHANGE: Always navigate to dashboard, status handling done there
+      Navigator.pushReplacementNamed(context, '/doctor-dashboard');
     } on AuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Login error: ${e.message}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login error: ${e.message}')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Login error: ${e.toString()}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login error: ${e.toString()}')),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

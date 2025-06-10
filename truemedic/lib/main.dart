@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
-
 import 'screens/welcome_screen.dart';
 import 'screens/auth/user_or_doctor_screen.dart';
 import 'screens/auth/user_login_screen.dart';
@@ -21,6 +20,9 @@ import 'screens/auth/auth_state.dart'; // Import the AuthStateListener
 import 'screens/auth/password_reset_screen.dart'; // Import the password reset screen
 import 'screens/auth/verification_pending_screen.dart'; // Import the verification pending screen
 import 'screens/home/doctor_verification_screen.dart'; // Import the doctor verification screen
+import 'screens/home/doctor_resubmit_screen.dart'; // Import the doctor resubmit screen
+import 'screens/home/doctor_dashboard_screen.dart'; // Import the doctor dashboard screen
+import 'widgets/app_drawer.dart'; // Import the app drawer
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,7 +74,7 @@ class _MyAppState extends State<MyApp> {
 
   void handleDeepLink(Uri uri) {
     print('Received deep link: $uri');
-    
+
     // Check if this is a password reset link
     if (uri.scheme == 'truemedic' && uri.host == 'reset-password') {
       // Navigate to password reset screen
@@ -115,8 +117,16 @@ class _MyAppState extends State<MyApp> {
           '/password-reset': (context) => const PasswordResetScreen(),
           '/verification-pending':
               (context) => const VerificationPendingScreen(),
+          '/doctor-resubmit': (context) {
+            final args =
+                ModalRoute.of(context)!.settings.arguments
+                    as Map<String, dynamic>;
+            return DoctorResubmitScreen(doctorData: args);
+          },
+          '/doctor-dashboard':
+              (context) => const DoctorDashboardScreen(),
+
           // Add other routes as needed
-          
         },
       ),
     );

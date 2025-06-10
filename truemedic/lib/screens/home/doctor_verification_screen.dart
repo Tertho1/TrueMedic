@@ -6,9 +6,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 class DoctorVerificationScreen extends StatefulWidget {
   final Map<String, dynamic> doctor;
+  final bool readOnly;
 
-  const DoctorVerificationScreen({Key? key, required this.doctor})
-    : super(key: key);
+  const DoctorVerificationScreen({
+    Key? key, 
+    required this.doctor,
+    this.readOnly = false,
+  }) : super(key: key);
 
   @override
   _DoctorVerificationScreenState createState() =>
@@ -341,7 +345,15 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Doctor Verification')),
+      appBar: AppBar(
+        title: Text(
+          widget.readOnly 
+              ? widget.doctor['rejected'] == true
+                  ? 'Rejected Application'
+                  : 'Verified Doctor'
+              : 'Doctor Verification'
+        ),
+      ),
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -756,37 +768,39 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
                     const SizedBox(height: 32),
 
                     // Action Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _approveDoctor,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            child: const Text(
-                              'APPROVE',
-                              style: TextStyle(color: Colors.white),
-                            ),
+                    widget.readOnly 
+                        ? Container() // No buttons in read-only mode
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _approveDoctor,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                  ),
+                                  child: const Text(
+                                    'APPROVE',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _showRejectDialog,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                  ),
+                                  child: const Text(
+                                    'REJECT',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _showRejectDialog,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            child: const Text(
-                              'REJECT',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),

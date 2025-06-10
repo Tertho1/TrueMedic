@@ -25,25 +25,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _checkAdminRole();
-    _fetchPendingDoctors();
+    _fetchAllDoctors(); // Replace individual fetch with combined method
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _fetchPendingDoctors() async {
+  // New combined fetch method
+  Future<void> _fetchAllDoctors() async {
     setState(() => _isLoading = true);
 
     try {
-      // First, check if we can read any doctors at all
-      // final allDoctors = await supabase.from('doctors').select();
-      // print('Total doctors in database: ${allDoctors.length}');
-
-      // Then run the filtered query
-      final response = await supabase
+      // Fetch pending doctors
+      final pendingResponse = await supabase
           .from('doctors')
           .select()
           .eq('verification_pending', true)
@@ -51,19 +42,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           .eq('rejected', false)
           .order('created_at');
 
-      // print('Pending doctors found: ${response.length}');
-      // print('Response data: $response');
+      // Fetch verified doctors
+      final verifiedResponse = await supabase
+          .from('doctors')
+          .select()
+          .eq('verified', true)
+          .eq('verification_pending', false)
+          .order('verified_at', ascending: false);
+
+      // Fetch rejected doctors
+      final rejectedResponse = await supabase
+          .from('doctors')
+          .select()
+          .eq('rejected', true)
+          .eq('verification_pending', false)
+          .order('verified_at', ascending: false);
 
       setState(() {
-        _pendingDoctors = List<Map<String, dynamic>>.from(response);
+        _pendingDoctors = List<Map<String, dynamic>>.from(pendingResponse);
+        _verifiedDoctors = List<Map<String, dynamic>>.from(verifiedResponse);
+        _rejectedDoctors = List<Map<String, dynamic>>.from(rejectedResponse);
       });
     } catch (e) {
-      print('Error fetching doctors: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          duration: const Duration(seconds: 10),
-        ),
+        SnackBar(content: Text('Error fetching doctors: ${e.toString()}')),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -108,9 +110,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildPendingList(),
-                _buildVerifiedList(),
-                _buildRejectedList(),
+                _buildDoctorsList(_pendingDoctors, isPending: true),
+                _buildDoctorsList(_verifiedDoctors),
+                _buildDoctorsList(_rejectedDoctors, isRejected: true),
               ],
             ),
           ),
@@ -119,30 +121,92 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 
-  Widget _buildPendingList() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_pendingDoctors.isEmpty) {
-      return const Center(child: Text('No pending verifications'));
+  // Improved list builder that works for all three types
+  Widget _buildDoctorsList(
+    List<Map<String, dynamic>> doctors, {
+    bool isPending = false,
+    bool isRejected = false,
+  }) {
+    if (doctors.isEmpty) {
+      return Center(
+        child: Text(
+          isPending
+              ? 'No pending doctor applications'
+              : isRejected
+              ? 'No rejected applications'
+              : 'No verified doctors',
+          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+        ),
+      );
     }
 
     return RefreshIndicator(
-      onRefresh: _fetchPendingDoctors,
+      onRefresh: _fetchAllDoctors,
       child: ListView.builder(
-        itemCount: _pendingDoctors.length,
+        itemCount: doctors.length,
+        padding: const EdgeInsets.all(16),
         itemBuilder: (context, index) {
-          final doctor = _pendingDoctors[index];
+          final doctor = doctors[index];
           return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 16),
             child: ListTile(
-              title: Text(doctor['full_name'] ?? 'Unknown'),
-              subtitle: Text(
-                'BMDC: ${doctor['bmdc_number']} • ${doctor['doctor_type']}',
+              leading: CircleAvatar(
+                backgroundColor:
+                    isPending
+                        ? Colors.amber
+                        : isRejected
+                        ? Colors.red
+                        : Colors.green,
+                child: Icon(
+                  isPending
+                      ? Icons.pending
+                      : isRejected
+                      ? Icons.cancel
+                      : Icons.check,
+                  color: Colors.white,
+                ),
               ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _navigateToDoctorVerification(doctor),
+              title: Text(doctor['full_name'] ?? 'Unknown'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('BMDC: ${doctor['bmdc_number']}'),
+                  Text('Type: ${doctor['doctor_type'] ?? 'N/A'}'),
+                  if (isRejected && doctor['rejection_reason'] != null)
+                    Text(
+                      'Reason: ${doctor['rejection_reason']}',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                ],
+              ),
+              trailing:
+                  isPending
+                      ? ElevatedButton(
+                        onPressed: () => _navigateToVerification(doctor),
+                        child: const Text('Verify'),
+                      )
+                      : isRejected
+                      ? ElevatedButton(
+                        onPressed: () => _allowResubmission(doctor),
+                        child: const Text('Allow Resubmit'),
+                      )
+                      : Row(
+                        // For verified doctors
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.remove_circle_outline,
+                              color: Colors.red,
+                            ),
+                            tooltip: 'Revoke Verification',
+                            onPressed: () => _confirmRevokeVerification(doctor),
+                          ),
+                          const Icon(Icons.check_circle, color: Colors.green),
+                        ],
+                      ),
+              onTap:
+                  () => _navigateToVerification(doctor, readOnly: !isPending),
             ),
           );
         },
@@ -150,24 +214,179 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 
-  Widget _buildVerifiedList() {
-    return Center(child: Text('Implement verified doctors list here'));
+  // Add this method to handle resubmissions
+  Future<void> _allowResubmission(Map<String, dynamic> doctor) async {
+    try {
+      await supabase
+          .from('doctors')
+          .update({
+            // Don't set verification_pending to true yet!
+            'verification_pending': false, // Changed from true
+            'rejected': true, // Keep as rejected until resubmission
+            'resubmission_allowed': true, // Enable resubmission flag
+          })
+          .eq('id', doctor['id']);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Doctor allowed to resubmit')),
+      );
+
+      _fetchAllDoctors(); // Refresh the lists
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
   }
 
-  Widget _buildRejectedList() {
-    return Center(child: Text('Implement rejected doctors list here'));
-  }
-
-  void _navigateToDoctorVerification(Map<String, dynamic> doctor) {
+  void _navigateToVerification(
+    Map<String, dynamic> doctor, {
+    bool readOnly = false,
+  }) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DoctorVerificationScreen(doctor: doctor),
+        builder:
+            (context) =>
+                DoctorVerificationScreen(doctor: doctor, readOnly: readOnly),
       ),
     ).then((result) {
       if (result == true) {
-        _fetchPendingDoctors();
+        _fetchAllDoctors();
       }
     });
+  }
+
+  void _confirmRevokeVerification(Map<String, dynamic> doctor) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Revoke Verification?'),
+            content: Text(
+              'Are you sure you want to revoke verification for Dr. ${doctor['full_name']}?\n\n'
+              'You can either reject their application or move it back to pending review.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _moveBackToPending(doctor);
+                },
+                child: const Text('Move to Pending'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _rejectVerifiedDoctor(doctor);
+                },
+                child: const Text(
+                  'Reject',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _moveBackToPending(Map<String, dynamic> doctor) async {
+    setState(() => _isLoading = true);
+
+    try {
+      await supabase
+          .from('doctors')
+          .update({
+            'verified': false,
+            'verification_pending': true,
+            'verified_at': null,
+          })
+          .eq('id', doctor['id']);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Doctor moved back to pending')),
+      );
+
+      _fetchAllDoctors();
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _rejectVerifiedDoctor(Map<String, dynamic> doctor) async {
+    // Show dialog to get rejection reason
+    final reasonController = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Provide Rejection Reason'),
+            content: TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                hintText: 'Why are you rejecting this doctor?',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, reasonController.text),
+                child: const Text('Submit'),
+              ),
+            ],
+          ),
+    );
+
+    if (reason == null || reason.isEmpty) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await supabase
+          .from('doctors')
+          .update({
+            'verified': false,
+            'verification_pending': false,
+            'rejected': true,
+            'rejection_reason': reason,
+            'resubmission_allowed': false, // Default to not allowed
+          })
+          .eq('id', doctor['id']);
+
+      // Update user role back from doctor to unverified
+      await supabase
+          .from('users')
+          .update({'role': 'doctor_unverified'})
+          .eq('id', doctor['id']);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Doctor verification revoked and rejected'),
+        ),
+      );
+
+      _fetchAllDoctors();
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 }
