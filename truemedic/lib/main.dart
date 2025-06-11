@@ -22,6 +22,7 @@ import 'screens/auth/verification_pending_screen.dart'; // Import the verificati
 import 'screens/home/doctor_verification_screen.dart'; // Import the doctor verification screen
 import 'screens/home/doctor_resubmit_screen.dart'; // Import the doctor resubmit screen
 import 'screens/home/doctor_dashboard_screen.dart'; // Import the doctor dashboard screen
+import 'screens/home/doctor_appointment_details_screen.dart'; // Import the doctor appointment details screen
 import 'widgets/app_drawer.dart'; // Import the app drawer
 
 void main() async {
@@ -123,8 +124,11 @@ class _MyAppState extends State<MyApp> {
                     as Map<String, dynamic>;
             return DoctorResubmitScreen(doctorData: args);
           },
-          '/doctor-dashboard':
-              (context) => const DoctorDashboardScreen(),
+          '/doctor-dashboard': (context) => const DoctorDashboardScreen(),
+          '/doctor-appointment-details':
+              (context) => DoctorAppointmentDetailsScreen(
+                doctorId: ModalRoute.of(context)?.settings.arguments as String,
+              ),
 
           // Add other routes as needed
         },
