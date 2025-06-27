@@ -6,7 +6,7 @@ import '../common_ui.dart';
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userProfile;
   
-  const EditProfileScreen({Key? key, required this.userProfile}) : super(key: key);
+  const EditProfileScreen({super.key, required this.userProfile});
   
   @override
   _EditProfileScreenState createState() => _EditProfileScreenState();

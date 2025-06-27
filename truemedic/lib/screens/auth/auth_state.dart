@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class AuthStateListener extends StatefulWidget {
   final Widget child;
   
-  const AuthStateListener({Key? key, required this.child}) : super(key: key);
+  const AuthStateListener({super.key, required this.child});
   
   @override
   _AuthStateListenerState createState() => _AuthStateListenerState();

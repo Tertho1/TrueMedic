@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../common_ui.dart';
 
 class VerificationPendingScreen extends StatelessWidget {
-  const VerificationPendingScreen({Key? key}) : super(key: key);
+  const VerificationPendingScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

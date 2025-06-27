@@ -5,8 +5,7 @@ import '../loading_indicator.dart';
 class DoctorAppointmentDetailsScreen extends StatefulWidget {
   final String doctorId;
 
-  const DoctorAppointmentDetailsScreen({Key? key, required this.doctorId})
-    : super(key: key);
+  const DoctorAppointmentDetailsScreen({super.key, required this.doctorId});
 
   @override
   _DoctorAppointmentDetailsScreenState createState() =>
@@ -24,7 +23,7 @@ class _DoctorAppointmentDetailsScreenState
   final _experienceController = TextEditingController();
 
   // Available days
-  final List<String> _weekdays = [
+  final List<String> _daysOfWeek = [
     'Monday',
     'Tuesday',
     'Wednesday',
@@ -33,20 +32,17 @@ class _DoctorAppointmentDetailsScreenState
     'Saturday',
     'Sunday',
   ];
-  final List<String> _selectedDays = [];
 
-  // Locations
-  List<AppointmentLocation> _locations = [];
+  // Store days per location
+  Map<int, Set<String>> _locationDays = {};
+
+  // Locations - using Map instead of custom class
+  List<Map<String, dynamic>> _appointmentLocations = [];
 
   // Loading state
   bool _isLoading = true;
   bool _isSaving = false;
-  String? _appointmentId;
-
-  // Appointment details and locations for fetching
-  Map<String, dynamic>? _appointmentDetails;
-  List<Map<String, dynamic>> _appointmentLocations = [];
-  bool _loadingAppointments = false;
+  String? _doctorAppointmentId;
 
   @override
   void initState() {
@@ -59,10 +55,6 @@ class _DoctorAppointmentDetailsScreenState
     _designationController.dispose();
     _specialitiesController.dispose();
     _experienceController.dispose();
-    // Dispose all location controllers
-    for (var location in _locations) {
-      location.dispose();
-    }
     super.dispose();
   }
 
@@ -71,98 +63,124 @@ class _DoctorAppointmentDetailsScreenState
 
     try {
       // Try to get existing appointment details
-      final response =
-          await supabase
-              .from('doctor_appointments')
-              .select()
-              .eq('doctor_id', widget.doctorId)
-              .maybeSingle();
+      final response = await supabase
+          .from('doctor_appointments')
+          .select()
+          .eq('doctor_id', widget.doctorId)
+          .maybeSingle();
 
       if (response != null) {
         // Store the appointment ID
-        _appointmentId = response['id'];
+        _doctorAppointmentId = response['id'];
 
         // Populate the main form with existing data
         setState(() {
           _designationController.text = response['designation'] ?? '';
           _specialitiesController.text = response['specialities'] ?? '';
           _experienceController.text = response['experience']?.toString() ?? '';
-
-          // Parse selected days
-          if (response['available_days'] != null) {
-            _selectedDays.clear();
-            _selectedDays.addAll(List<String>.from(response['available_days']));
-          }
         });
 
         // Fetch location data
-        if (_appointmentId != null) {
-          // Add this null check
-          final locationResponse = await supabase
-              .from('appointment_locations')
-              .select()
-              .eq('doctor_appointment_id', _appointmentId!);
-
-          if (locationResponse != null &&
-              locationResponse is List &&
-              locationResponse.isNotEmpty) {
-            setState(() {
-              _locations =
-                  locationResponse
-                      .map((loc) => AppointmentLocation.fromJson(loc))
-                      .toList();
-            });
-          } else {
-            setState(() {
-              _locations = [AppointmentLocation()];
-            });
-          }
-        } else {
-          // No appointment ID yet, just add an empty location
-          setState(() {
-            _locations = [AppointmentLocation()];
-          });
-        }
+        await _fetchAppointmentLocations(_doctorAppointmentId!);
       } else {
         // No existing data, add one empty location
-        setState(() {
-          _locations = [AppointmentLocation()];
-        });
+        _addEmptyLocation();
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading data: ${e.toString()}')),
       );
       // Add one empty location even on error
-      setState(() {
-        _locations = [AppointmentLocation()];
-      });
+      _addEmptyLocation();
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  void _toggleDaySelection(String day) {
+  void _addEmptyLocation() {
     setState(() {
-      if (_selectedDays.contains(day)) {
-        _selectedDays.remove(day);
-      } else {
-        _selectedDays.add(day);
-      }
+      _appointmentLocations.add({
+        'location_name': '',
+        'address': '',
+        'contact_number': '',
+        'start_time': '09:00',
+        'end_time': '17:00',
+        'max_appointments_per_day': 20,
+        'appointment_duration': 15,
+        'available_days': <String>[],
+      });
+      
+      // Initialize empty days set for new location
+      _locationDays[_appointmentLocations.length - 1] = <String>{};
     });
+  }
+
+  Future<void> _fetchAppointmentLocations(String appointmentId) async {
+    try {
+      final locationsResponse = await supabase
+          .from('appointment_locations')
+          .select()
+          .eq('doctor_appointment_id', appointmentId);
+
+      setState(() {
+        _appointmentLocations = List<Map<String, dynamic>>.from(locationsResponse);
+        
+        // Initialize location days from database
+        _locationDays.clear();
+        for (int i = 0; i < _appointmentLocations.length; i++) {
+          final locationDays = _appointmentLocations[i]['available_days'] as List<dynamic>?;
+          if (locationDays != null) {
+            _locationDays[i] = Set<String>.from(locationDays.map((day) => day.toString()));
+          } else {
+            _locationDays[i] = <String>{};
+          }
+        }
+        
+        // If no locations exist, add one empty location
+        if (_appointmentLocations.isEmpty) {
+          _addEmptyLocation();
+        }
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading locations: ${e.toString()}')),
+      );
+      _addEmptyLocation();
+    }
   }
 
   void _addNewLocation() {
     setState(() {
-      _locations.add(AppointmentLocation());
+      _appointmentLocations.add({
+        'location_name': '',
+        'address': '',
+        'contact_number': '',
+        'start_time': '09:00',
+        'end_time': '17:00',
+        'max_appointments_per_day': 20,
+        'appointment_duration': 15,
+        'available_days': <String>[],
+      });
+      
+      // Initialize empty days set for new location
+      _locationDays[_appointmentLocations.length - 1] = <String>{};
     });
   }
 
   void _removeLocation(int index) {
-    if (_locations.length > 1) {
+    if (_appointmentLocations.length > 1) {
       setState(() {
-        final location = _locations.removeAt(index);
-        location.dispose(); // Clean up controllers
+        _appointmentLocations.removeAt(index);
+        _locationDays.remove(index);
+        
+        // Reindex the remaining location days
+        Map<int, Set<String>> newLocationDays = {};
+        for (int i = 0; i < _appointmentLocations.length; i++) {
+          if (_locationDays.containsKey(i < index ? i : i + 1)) {
+            newLocationDays[i] = _locationDays[i < index ? i : i + 1]!;
+          }
+        }
+        _locationDays = newLocationDays;
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -174,187 +192,88 @@ class _DoctorAppointmentDetailsScreenState
   }
 
   Future<void> _saveAppointmentDetails() async {
-    if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fix the errors above')),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    // Validate that at least one day is selected
-    if (_selectedDays.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one available day'),
-        ),
-      );
-      return;
-    }
-
-    // Validate that all locations have required data
-    bool locationsValid = true;
-    for (var i = 0; i < _locations.length; i++) {
-      if (!_locations[i].isValid()) {
-        locationsValid = false;
+    // Validate that each location has at least one day selected
+    for (int i = 0; i < _appointmentLocations.length; i++) {
+      final locationDays = _locationDays[i] ?? <String>{};
+      if (locationDays.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Please complete all fields for Location ${i + 1}'),
-          ),
+          SnackBar(content: Text('Please select available days for Location ${i + 1}')),
         );
-        break;
+        return;
       }
     }
-
-    if (!locationsValid) return;
 
     setState(() => _isSaving = true);
 
     try {
-      // Main appointment data
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Save or update doctor_appointments (without available_days)
       final appointmentData = {
-        'doctor_id': widget.doctorId,
+        'doctor_id': userId,
         'designation': _designationController.text,
         'specialities': _specialitiesController.text,
         'experience': int.tryParse(_experienceController.text) ?? 0,
-        'available_days': _selectedDays,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
-      // Insert or update main appointment record
-      final appointmentResult =
-          _appointmentId == null
-              ? await supabase
-                  .from('doctor_appointments')
-                  .insert(appointmentData)
-                  .select('id')
-                  .single()
-              : await supabase
-                  .from('doctor_appointments')
-                  .update(appointmentData)
-                  .eq(
-                    'id',
-                    _appointmentId!,
-                  ) // Add non-null assertion operator here
-                  .select('id')
-                  .single();
-
-      final String appointmentId;
-      if (_appointmentId == null) {
-        if (appointmentResult.containsKey('id')) {
-          appointmentId = appointmentResult['id'] as String;
-        } else {
-          throw Exception('Failed to get appointment ID from response');
-        }
-      } else {
-        appointmentId = _appointmentId!;
-      }
-
-      // Update stored ID safely
-      _appointmentId = appointmentId;
-
-      // Handle existing location records - delete them all and reinsert
-      // This is simpler than tracking updates to existing locations
-      if (_appointmentId != null) {
+      Map<String, dynamic> doctorAppointment;
+      if (_doctorAppointmentId != null) {
         await supabase
-            .from('appointment_locations')
-            .delete()
-            .eq(
-              'doctor_appointment_id',
-              _appointmentId!,
-            ); // Add the ! operator here
+            .from('doctor_appointments')
+            .update(appointmentData)
+            .eq('id', _doctorAppointmentId!);
+        doctorAppointment = {'id': _doctorAppointmentId};
+      } else {
+        doctorAppointment = await supabase
+            .from('doctor_appointments')
+            .insert(appointmentData)
+            .select()
+            .single();
+        _doctorAppointmentId = doctorAppointment['id'];
       }
 
-      // Insert all location records
-      final locationData =
-          _locations
-              .map(
-                (loc) => {
-                  'doctor_appointment_id':
-                      appointmentId, // Use the safe non-nullable value
-                  'location_name': loc.nameController.text,
-                  'address': loc.addressController.text,
-                  'contact_number': loc.contactController.text,
-                  'start_time': loc.formatTimeOfDay(loc.startTime),
-                  'end_time': loc.formatTimeOfDay(loc.endTime),
-                  'max_appointments_per_day': loc.maxAppointments,
-                  'appointment_duration': loc.appointmentDuration,
-                  'created_at': DateTime.now().toIso8601String(),
-                  'updated_at': DateTime.now().toIso8601String(),
-                },
-              )
-              .toList();
+      // Clear existing locations
+      await supabase
+          .from('appointment_locations')
+          .delete()
+          .eq('doctor_appointment_id', _doctorAppointmentId!);
 
-      await supabase.from('appointment_locations').insert(locationData);
+      // Insert new locations with their specific available days
+      for (int i = 0; i < _appointmentLocations.length; i++) {
+        final location = _appointmentLocations[i];
+        final locationDays = _locationDays[i]?.toList() ?? [];
+        
+        await supabase.from('appointment_locations').insert({
+          'doctor_appointment_id': _doctorAppointmentId!,
+          'location_name': location['location_name'],
+          'address': location['address'],
+          'contact_number': location['contact_number'],
+          'start_time': location['start_time'],
+          'end_time': location['end_time'],
+          'max_appointments_per_day': location['max_appointments_per_day'],
+          'appointment_duration': location['appointment_duration'],
+          'available_days': locationDays, // Save days per location
+        });
+      }
 
       if (mounted) {
-        Navigator.pop(context, true); // Return success
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Appointment details saved successfully')),
+        );
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving appointment details: ${e.toString()}'),
-          ),
+          SnackBar(content: Text('Error: ${e.toString()}')),
         );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
-    }
-  }
-
-  // Fetch appointment details for the doctor
-  Future<void> _fetchAppointmentDetails() async {
-    if (widget.doctorId.isEmpty) return;
-
-    setState(() => _loadingAppointments = true);
-
-    try {
-      // Fetch doctor appointment details
-      final appointmentResponse =
-          await supabase
-              .from('doctor_appointments')
-              .select()
-              .eq('doctor_id', widget.doctorId)
-              .maybeSingle();
-
-      if (appointmentResponse != null) {
-        setState(() {
-          _appointmentDetails = appointmentResponse;
-
-          // Now fetch location data
-          _fetchAppointmentLocations(appointmentResponse['id']);
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading appointment details: ${e.toString()}'),
-        ),
-      );
-    } finally {
-      setState(() => _loadingAppointments = false);
-    }
-  }
-
-  // Method to fetch location data
-  Future<void> _fetchAppointmentLocations(String appointmentId) async {
-    try {
-      final locationsResponse = await supabase
-          .from('appointment_locations')
-          .select()
-          .eq('doctor_appointment_id', appointmentId);
-
-      if (locationsResponse != null) {
-        setState(() {
-          _appointmentLocations = List<Map<String, dynamic>>.from(
-            locationsResponse,
-          );
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading locations: ${e.toString()}')),
-      );
     }
   }
 
@@ -365,358 +284,116 @@ class _DoctorAppointmentDetailsScreenState
         title: const Text('Appointment Details'),
         centerTitle: true,
         backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
       ),
       body: Stack(
         children: [
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Professional Details Section
-                      _buildSectionHeader('Professional Details'),
-                      _buildTextField(
-                        controller: _designationController,
-                        label: 'Designation',
-                        hint: 'e.g., Senior Consultant, Assistant Professor',
-                        icon: Icons.business_center,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your designation';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _specialitiesController,
-                        label: 'Specialities',
-                        hint: 'e.g., Cardiology, Neurology',
-                        icon: Icons.local_hospital,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your specialities';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _experienceController,
-                        label: 'Experience (years)',
-                        hint: 'e.g., 5',
-                        icon: Icons.timeline,
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your years of experience';
-                          }
-                          if (int.tryParse(value) == null) {
-                            return 'Please enter a valid number';
-                          }
-                          return null;
-                        },
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Available Days Selection
-                      _buildSectionHeader('Available Days'),
-                      Wrap(
-                        spacing: 8,
-                        children:
-                            _weekdays.map((day) {
-                              final isSelected = _selectedDays.contains(day);
-                              return FilterChip(
-                                label: Text(day),
-                                selected: isSelected,
-                                onSelected: (_) => _toggleDaySelection(day),
-                                backgroundColor: Colors.grey[200],
-                                selectedColor: Colors.teal[100],
-                                checkmarkColor: Colors.teal,
-                              );
-                            }).toList(),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Appointment Locations
-                      _buildSectionHeader('Appointment Locations'),
-
-                      // List of location forms
-                      ..._locations.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final location = entry.value;
-
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.teal.shade100),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Location ${index + 1}',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.teal,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete,
-                                        color: Colors.red,
-                                      ),
-                                      onPressed: () => _removeLocation(index),
-                                      tooltip: 'Remove Location',
-                                    ),
-                                  ],
-                                ),
-                                const Divider(),
-                                const SizedBox(height: 8),
-
-                                // Location name field
-                                _buildTextField(
-                                  controller: location.nameController,
-                                  label: 'Location Name',
-                                  hint: 'e.g., City Hospital, Private Clinic',
-                                  icon: Icons.place,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter location name';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-
-                                // Address field
-                                _buildTextField(
-                                  controller: location.addressController,
-                                  label: 'Address',
-                                  hint: 'e.g., 123 Medical St, Room 301',
-                                  icon: Icons.location_on,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter address';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-
-                                // Contact number field
-                                _buildTextField(
-                                  controller: location.contactController,
-                                  label: 'Contact Number',
-                                  hint: 'e.g., +1 234 567 8900',
-                                  icon: Icons.phone,
-                                  keyboardType: TextInputType.phone,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter contact number';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Time range
-                                const Text(
-                                  'Appointment Hours',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ListTile(
-                                        title: const Text('Start Time'),
-                                        subtitle: Text(
-                                          location.formatTimeOfDay(
-                                            location.startTime,
-                                          ),
-                                        ),
-                                        trailing: const Icon(Icons.access_time),
-                                        onTap: () async {
-                                          final pickedTime =
-                                              await showTimePicker(
-                                                context: context,
-                                                initialTime: location.startTime,
-                                              );
-
-                                          if (pickedTime != null) {
-                                            setState(() {
-                                              location.startTime = pickedTime;
-                                            });
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: ListTile(
-                                        title: const Text('End Time'),
-                                        subtitle: Text(
-                                          location.formatTimeOfDay(
-                                            location.endTime,
-                                          ),
-                                        ),
-                                        trailing: const Icon(Icons.access_time),
-                                        onTap: () async {
-                                          final pickedTime =
-                                              await showTimePicker(
-                                                context: context,
-                                                initialTime: location.endTime,
-                                              );
-
-                                          if (pickedTime != null) {
-                                            setState(() {
-                                              location.endTime = pickedTime;
-                                            });
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 16),
-
-                                // Appointment Parameters
-                                const Text(
-                                  'Appointment Parameters',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-
-                                ListTile(
-                                  title: const Text('Max Appointments Per Day'),
-                                  subtitle: Text(
-                                    '${location.maxAppointments} appointments',
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove),
-                                        onPressed: () {
-                                          if (location.maxAppointments > 1) {
-                                            setState(() {
-                                              location.maxAppointments--;
-                                            });
-                                          }
-                                        },
-                                      ),
-                                      Text('${location.maxAppointments}'),
-                                      IconButton(
-                                        icon: const Icon(Icons.add),
-                                        onPressed: () {
-                                          setState(() {
-                                            location.maxAppointments++;
-                                          });
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                ListTile(
-                                  title: const Text('Appointment Duration'),
-                                  subtitle: Text(
-                                    '${location.appointmentDuration} minutes per appointment',
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove),
-                                        onPressed: () {
-                                          if (location.appointmentDuration >
-                                              5) {
-                                            setState(() {
-                                              location.appointmentDuration -= 5;
-                                            });
-                                          }
-                                        },
-                                      ),
-                                      Text(
-                                        '${location.appointmentDuration} min',
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.add),
-                                        onPressed: () {
-                                          setState(() {
-                                            location.appointmentDuration += 5;
-                                          });
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                      }).toList(),
-
-                      // Add location button
-                      Center(
-                        child: ElevatedButton.icon(
-                          onPressed: _addNewLocation,
-                          icon: const Icon(Icons.add_location),
-                          label: const Text('Add Another Location'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal.shade100,
-                            foregroundColor: Colors.teal.shade800,
-                          ),
+                  padding: const EdgeInsets.all(16),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Professional Details Section
+                        _buildSectionHeader('Professional Details'),
+                        _buildTextField(
+                          controller: _designationController,
+                          label: 'Designation',
+                          hint: 'e.g., Senior Consultant, Assistant Professor',
+                          icon: Icons.business_center,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your designation';
+                            }
+                            return null;
+                          },
                         ),
-                      ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _specialitiesController,
+                          label: 'Specialities',
+                          hint: 'e.g., Cardiology, Neurology',
+                          icon: Icons.local_hospital,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your specialities';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _experienceController,
+                          label: 'Experience (years)',
+                          hint: 'e.g., 5',
+                          icon: Icons.timeline,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your years of experience';
+                            }
+                            if (int.tryParse(value) == null) {
+                              return 'Please enter a valid number';
+                            }
+                            return null;
+                          },
+                        ),
 
-                      const SizedBox(height: 32),
+                        const SizedBox(height: 24),
 
-                      // Save button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isSaving ? null : _saveAppointmentDetails,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                        // Appointment Locations
+                        _buildSectionHeader('Appointment Locations'),
+
+                        // List of location forms
+                        ..._appointmentLocations.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final location = entry.value;
+                          return _buildLocationCard(location, index);
+                        }),
+
+                        // Add location button
+                        const SizedBox(height: 16),
+                        Center(
+                          child: ElevatedButton.icon(
+                            onPressed: _addNewLocation,
+                            icon: const Icon(Icons.add_location),
+                            label: const Text('Add Another Location'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal.shade100,
+                              foregroundColor: Colors.teal.shade800,
                             ),
                           ),
-                          child: Text(
-                            _isSaving
-                                ? 'Saving...'
-                                : 'Save Appointment Details',
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Save button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isSaving ? null : _saveAppointmentDetails,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 15),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              _isSaving
+                                  ? 'Saving...'
+                                  : 'Save Appointment Details',
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
           if (_isSaving) const LoadingIndicator(),
         ],
       ),
@@ -763,88 +440,210 @@ class _DoctorAppointmentDetailsScreenState
       validator: validator,
     );
   }
-}
 
-class AppointmentLocation {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController addressController = TextEditingController();
-  final TextEditingController contactController = TextEditingController();
-  TimeOfDay startTime = const TimeOfDay(hour: 9, minute: 0);
-  TimeOfDay endTime = const TimeOfDay(hour: 17, minute: 0);
-  int maxAppointments = 20;
-  int appointmentDuration = 15; // minutes
+  Widget _buildLocationCard(Map<String, dynamic> location, int index) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Location ${index + 1}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.teal,
+                  ),
+                ),
+                if (_appointmentLocations.length > 1)
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _removeLocation(index),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
-  AppointmentLocation();
+            // Location Name
+            TextFormField(
+              initialValue: location['location_name'],
+              decoration: const InputDecoration(
+                labelText: 'Location Name *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.business),
+              ),
+              validator: (value) => value?.isEmpty ?? true ? 'Location name is required' : null,
+              onChanged: (value) => location['location_name'] = value,
+            ),
+            const SizedBox(height: 12),
 
-  AppointmentLocation.fromJson(Map<String, dynamic> json) {
-    nameController.text = json['location_name'] ?? '';
-    addressController.text = json['address'] ?? '';
-    contactController.text = json['contact_number'] ?? '';
+            // Address
+            TextFormField(
+              initialValue: location['address'],
+              decoration: const InputDecoration(
+                labelText: 'Address *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_on),
+              ),
+              validator: (value) => value?.isEmpty ?? true ? 'Address is required' : null,
+              onChanged: (value) => location['address'] = value,
+              maxLines: 2,
+            ),
+            const SizedBox(height: 12),
 
-    // Parse time strings
-    if (json['start_time'] != null) {
-      final parts = json['start_time'].split(':');
-      if (parts.length == 2) {
-        startTime = TimeOfDay(
-          hour: int.tryParse(parts[0]) ?? 9,
-          minute: int.tryParse(parts[1]) ?? 0,
+            // Contact Number
+            TextFormField(
+              initialValue: location['contact_number'],
+              decoration: const InputDecoration(
+                labelText: 'Contact Number',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.phone),
+              ),
+              onChanged: (value) => location['contact_number'] = value,
+            ),
+            const SizedBox(height: 12),
+
+            // Time Row
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTimeField(
+                    'Start Time',
+                    location['start_time'],
+                    (time) => location['start_time'] = time,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildTimeField(
+                    'End Time',
+                    location['end_time'],
+                    (time) => location['end_time'] = time,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Appointments Row
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    initialValue: location['max_appointments_per_day'].toString(),
+                    decoration: const InputDecoration(
+                      labelText: 'Max Appointments/Day',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.event),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value?.isEmpty ?? true) return 'Required';
+                      if (int.tryParse(value!) == null) return 'Must be a number';
+                      return null;
+                    },
+                    onChanged: (value) => location['max_appointments_per_day'] = int.tryParse(value) ?? 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    initialValue: location['appointment_duration'].toString(),
+                    decoration: const InputDecoration(
+                      labelText: 'Duration (minutes)',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.timer),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value?.isEmpty ?? true) return 'Required';
+                      if (int.tryParse(value!) == null) return 'Must be a number';
+                      return null;
+                    },
+                    onChanged: (value) => location['appointment_duration'] = int.tryParse(value) ?? 15,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Available Days for THIS Location
+            const Text(
+              'Available Days for This Location:',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildLocationDaysSelector(index),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimeField(String label, String initialTime, ValueChanged<String> onChanged) {
+    return TextFormField(
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        prefixIcon: const Icon(Icons.access_time),
+      ),
+      readOnly: true,
+      controller: TextEditingController(text: initialTime),
+      onTap: () async {
+        final TimeOfDay? picked = await showTimePicker(
+          context: context,
+          initialTime: TimeOfDay.now(),
         );
-      }
-    }
+        if (picked != null) {
+          final String formattedTime = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+          onChanged(formattedTime);
+        }
+      },
+    );
+  }
 
-    if (json['end_time'] != null) {
-      final parts = json['end_time'].split(':');
-      if (parts.length == 2) {
-        endTime = TimeOfDay(
-          hour: int.tryParse(parts[0]) ?? 17,
-          minute: int.tryParse(parts[1]) ?? 0,
+  Widget _buildLocationDaysSelector(int locationIndex) {
+    final selectedDays = _locationDays[locationIndex] ?? <String>{};
+    
+    return Wrap(
+      spacing: 8,
+      children: _daysOfWeek.map((day) {
+        final isSelected = selectedDays.contains(day);
+        return FilterChip(
+          label: Text(day),
+          selected: isSelected,
+          onSelected: (selected) {
+            setState(() {
+              if (!_locationDays.containsKey(locationIndex)) {
+                _locationDays[locationIndex] = <String>{};
+              }
+              
+              if (selected) {
+                _locationDays[locationIndex]!.add(day);
+              } else {
+                _locationDays[locationIndex]!.remove(day);
+              }
+              
+              // Update the location data
+              _appointmentLocations[locationIndex]['available_days'] = 
+                  _locationDays[locationIndex]!.toList();
+            });
+          },
+          selectedColor: Colors.teal.shade200,
+          backgroundColor: Colors.grey.shade200,
         );
-      }
-    }
-
-    maxAppointments = json['max_appointments_per_day'] ?? 20;
-    appointmentDuration = json['appointment_duration'] ?? 15;
-  }
-
-  String formatTimeOfDay(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
-
-  bool isValid() {
-    return nameController.text.isNotEmpty &&
-        addressController.text.isNotEmpty &&
-        contactController.text.isNotEmpty;
-  }
-
-  void dispose() {
-    nameController.dispose();
-    addressController.dispose();
-    contactController.dispose();
-  }
-
-  // Add this utility method to the AppointmentLocation class
-  List<String> getAvailableTimeSlots(String date) {
-    List<String> slots = [];
-    
-    // Parse hours and minutes
-    final startHour = startTime.hour;
-    final startMinute = startTime.minute;
-    final endHour = endTime.hour;
-    final endMinute = endTime.minute;
-    
-    // Calculate total minutes
-    int startMinutes = startHour * 60 + startMinute;
-    int endMinutes = endHour * 60 + endMinute;
-    
-    // Generate time slots
-    for (int time = startMinutes; time + appointmentDuration <= endMinutes; time += appointmentDuration) {
-      final hour = (time ~/ 60).toString().padLeft(2, '0');
-      final minute = (time % 60).toString().padLeft(2, '0');
-      slots.add('$hour:$minute');
-    }
-    
-    return slots;
+      }).toList(),
+    );
   }
 }

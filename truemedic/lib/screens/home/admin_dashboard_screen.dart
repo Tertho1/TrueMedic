@@ -5,7 +5,7 @@ import '../../widgets/base_scaffold.dart';
 import 'doctor_verification_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({Key? key}) : super(key: key);
+  const AdminDashboardScreen({super.key});
 
   @override
   _AdminDashboardScreenState createState() => _AdminDashboardScreenState();

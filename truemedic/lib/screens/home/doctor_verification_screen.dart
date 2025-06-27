@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../loading_indicator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class DoctorVerificationScreen extends StatefulWidget {
@@ -9,10 +8,10 @@ class DoctorVerificationScreen extends StatefulWidget {
   final bool readOnly;
 
   const DoctorVerificationScreen({
-    Key? key,
+    super.key,
     required this.doctor,
     this.readOnly = false,
-  }) : super(key: key);
+  });
 
   @override
   _DoctorVerificationScreenState createState() =>
@@ -657,8 +656,9 @@ class _DoctorVerificationScreenState extends State<DoctorVerificationScreen> {
                                                   child,
                                                   loadingProgress,
                                                 ) {
-                                                  if (loadingProgress == null)
+                                                  if (loadingProgress == null) {
                                                     return child;
+                                                  }
                                                   return Center(
                                                     child: CircularProgressIndicator(
                                                       value:

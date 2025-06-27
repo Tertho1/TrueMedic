@@ -8,8 +8,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 class DoctorResubmitScreen extends StatefulWidget {
   final Map<String, dynamic> doctorData;
 
-  const DoctorResubmitScreen({Key? key, required this.doctorData})
-    : super(key: key);
+  const DoctorResubmitScreen({super.key, required this.doctorData});
 
   @override
   _DoctorResubmitScreenState createState() => _DoctorResubmitScreenState();

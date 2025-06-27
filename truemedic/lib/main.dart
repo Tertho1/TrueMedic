@@ -3,7 +3,6 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'screens/welcome_screen.dart';
 import 'screens/auth/user_or_doctor_screen.dart';
@@ -19,11 +18,11 @@ import 'screens/splash_screen.dart'; // Import the splash screen
 import 'screens/auth/auth_state.dart'; // Import the AuthStateListener
 import 'screens/auth/password_reset_screen.dart'; // Import the password reset screen
 import 'screens/auth/verification_pending_screen.dart'; // Import the verification pending screen
-import 'screens/home/doctor_verification_screen.dart'; // Import the doctor verification screen
+// Import the doctor verification screen
 import 'screens/home/doctor_resubmit_screen.dart'; // Import the doctor resubmit screen
 import 'screens/home/doctor_dashboard_screen.dart'; // Import the doctor dashboard screen
 import 'screens/home/doctor_appointment_details_screen.dart'; // Import the doctor appointment details screen
-import 'widgets/app_drawer.dart'; // Import the app drawer
+// Import the app drawer
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +39,7 @@ void main() async {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   _MyAppState createState() => _MyAppState();
