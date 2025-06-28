@@ -11,21 +11,19 @@ class DoctorDashboardScreen extends StatefulWidget {
   const DoctorDashboardScreen({super.key});
 
   @override
-  _DoctorDashboardScreenState createState() => _DoctorDashboardScreenState();
+  DoctorDashboardScreenState createState() => DoctorDashboardScreenState();
 }
 
-class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
+class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   final supabase = Supabase.instance.client;
   Map<String, dynamic>? _doctorProfile;
   bool _isLoading = true;
   bool _isLoggingOut = false;
 
-  // Appointment details variables
+  // Professional details variables (from doctor_appointments table)
   Map<String, dynamic>? _appointmentDetails;
   List<Map<String, dynamic>> _appointmentLocations = [];
-  bool _loadingAppointments = false;
-  List<Map<String, dynamic>> _doctorAppointments = [];
-  bool _loadingDoctorAppointments = false;
+  bool _loadingAppointmentDetails = false;
 
   @override
   void initState() {
@@ -37,7 +35,6 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     await _fetchDoctorProfile();
     if (_doctorProfile != null && _doctorProfile!['verified'] == true) {
       await _fetchAppointmentDetails();
-      await _fetchDoctorAppointments();
     }
   }
 
@@ -65,9 +62,10 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   Future<void> _fetchAppointmentDetails() async {
     if (_doctorProfile == null || !mounted) return;
 
-    setState(() => _loadingAppointments = true);
+    setState(() => _loadingAppointmentDetails = true);
 
     try {
+      // Fetch professional details from doctor_appointments table
       final appointmentResponse =
           await supabase
               .from('doctor_appointments')
@@ -89,7 +87,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         _showError('Error loading appointment details: ${e.toString()}');
       }
     } finally {
-      if (mounted) setState(() => _loadingAppointments = false);
+      if (mounted) setState(() => _loadingAppointmentDetails = false);
     }
   }
 
@@ -103,7 +101,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
       if (mounted) {
         setState(() {
           _appointmentLocations = List<Map<String, dynamic>>.from(
-            locationsResponse ?? [],
+            locationsResponse,
           );
         });
       }
@@ -114,1027 +112,51 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     }
   }
 
-  Future<void> _fetchDoctorAppointments() async {
-    if (!mounted) return;
-    setState(() => _loadingDoctorAppointments = true);
-
-    try {
-      final response = await supabase
-          .from('appointments')
-          .select('*, users:patient_id(full_name)')
-          .eq('doctor_id', supabase.auth.currentUser!.id)
-          .order('appointment_date', ascending: true)
-          .order('start_time', ascending: true);
-
-      if (mounted) {
-        setState(() {
-          _doctorAppointments = List<Map<String, dynamic>>.from(response ?? []);
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        _showError('Error loading appointments: ${e.toString()}');
-      }
-    } finally {
-      if (mounted) setState(() => _loadingDoctorAppointments = false);
-    }
-  }
-
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     }
-  }
-
-  void _showAllAppointmentsModal() {
-    _fetchDoctorAppointments().then((_) {
-      if (mounted) {
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          builder:
-              (context) => DraggableScrollableSheet(
-                initialChildSize: 0.6,
-                minChildSize: 0.4,
-                maxChildSize: 0.9,
-                expand: false,
-                builder: (context, scrollController) {
-                  return _buildAppointmentsModalContent(scrollController);
-                },
-              ),
-        );
-      }
-    });
-  }
-
-  Widget _buildAppointmentsModalContent(ScrollController scrollController) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(5),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'All Your Appointments',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showAllAppointmentsModal();
-                },
-              ),
-            ],
-          ),
-          const Divider(),
-          const SizedBox(height: 8),
-          Expanded(
-            child:
-                _loadingDoctorAppointments
-                    ? const Center(child: CircularProgressIndicator())
-                    : _doctorAppointments.isEmpty
-                    ? const Center(child: Text('No appointments scheduled'))
-                    : ListView.builder(
-                      controller: scrollController,
-                      itemCount: _doctorAppointments.length,
-                      itemBuilder: (context, index) {
-                        final appointment = _doctorAppointments[index];
-                        return _buildAppointmentModalTile(appointment);
-                      },
-                    ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAppointmentModalTile(Map<String, dynamic> appointment) {
-    final DateTime appointmentDate = DateTime.parse(
-      appointment['appointment_date'],
-    );
-    final String formattedDate =
-        '${appointmentDate.day}/${appointmentDate.month}/${appointmentDate.year}';
-
-    Color statusColor;
-    switch (appointment['status']) {
-      case 'scheduled':
-        statusColor = Colors.blue;
-        break;
-      case 'completed':
-        statusColor = Colors.green;
-        break;
-      case 'cancelled':
-        statusColor = Colors.red;
-        break;
-      default:
-        statusColor = Colors.grey;
-    }
-
-    String patientName = 'Unknown';
-    if (appointment['users'] != null) {
-      patientName = appointment['users']['full_name'] ?? 'Unknown';
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: statusColor, width: 4)),
-        color: statusColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        dense: true,
-        leading: Icon(Icons.person, color: statusColor, size: 20),
-        title: Text(
-          patientName,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$formattedDate • ${appointment['start_time']} - ${appointment['end_time']}',
-              style: const TextStyle(fontSize: 12),
-            ),
-            if (appointment['reason'] != null)
-              Text(
-                'Reason: ${appointment['reason']}',
-                style: const TextStyle(fontSize: 11),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: statusColor),
-              ),
-              child: Text(
-                appointment['status'].toString().toUpperCase(),
-                style: TextStyle(
-                  color: statusColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-            PopupMenuButton<String>(
-              icon: Icon(
-                Icons.more_vert,
-                size: 16,
-                color: Colors.grey.shade600,
-              ),
-              onSelected:
-                  (value) => _handleAppointmentAction(value, appointment),
-              itemBuilder: (context) {
-                List<PopupMenuEntry<String>> items = [];
-
-                if (appointment['status'] == 'scheduled') {
-                  items.addAll([
-                    const PopupMenuItem(
-                      value: 'complete',
-                      child: Text('Mark Complete'),
-                    ),
-                    const PopupMenuItem(value: 'cancel', child: Text('Cancel')),
-                  ]);
-                }
-
-                items.add(
-                  const PopupMenuItem(value: 'notes', child: Text('Add Notes')),
-                );
-
-                return items;
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _handleAppointmentAction(
-    String action,
-    Map<String, dynamic> appointment,
-  ) {
-    switch (action) {
-      case 'complete':
-        _updateAppointmentStatus(appointment['id'], 'completed');
-        break;
-      case 'cancel':
-        _updateAppointmentStatus(appointment['id'], 'cancelled');
-        break;
-      case 'notes':
-        _showAddNotesDialog(appointment);
-        break;
-    }
-  }
-
-  Future<void> _updateAppointmentStatus(
-    String appointmentId,
-    String status,
-  ) async {
-    try {
-      await supabase
-          .from('appointments')
-          .update({
-            'status': status,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', appointmentId);
-
-      await _fetchDoctorAppointments();
-
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-        _showAllAppointmentsModal();
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Appointment marked as $status')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating appointment: ${e.toString()}'),
-          ),
-        );
-      }
-    }
-  }
-
-  void _showAddNotesDialog(Map<String, dynamic> appointment) {
-    final notesController = TextEditingController(
-      text: appointment['notes'] ?? '',
-    );
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Add/Edit Notes'),
-            content: TextField(
-              controller: notesController,
-              decoration: const InputDecoration(
-                hintText: 'Enter notes about this appointment',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 5,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    await supabase
-                        .from('appointments')
-                        .update({
-                          'notes': notesController.text,
-                          'updated_at': DateTime.now().toIso8601String(),
-                        })
-                        .eq('id', appointment['id']);
-
-                    Navigator.pop(context);
-                    await _fetchDoctorAppointments();
-
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Notes updated successfully'),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error saving notes: ${e.toString()}'),
-                        ),
-                      );
-                    }
-                  }
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-    );
   }
 
   Future<void> _logout() async {
     setState(() => _isLoggingOut = true);
-
     try {
       await supabase.auth.signOut();
       if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        Navigator.of(context).pushReplacementNamed('/login');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error signing out: ${e.toString()}')),
-        );
+        _showError('Error logging out: ${e.toString()}');
       }
     } finally {
       if (mounted) setState(() => _isLoggingOut = false);
     }
   }
 
-  void _navigateToEditProfile() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit profile not implemented yet')),
-    );
-  }
-
-  void _navigateToResubmit() async {
-    if (_doctorProfile == null) return;
-
-    final result = await Navigator.push(
+  void _navigateToResubmit() {
+    Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DoctorResubmitScreen(doctorData: _doctorProfile!),
+        builder: (context) => DoctorResubmitScreen(
+          doctorData: _doctorProfile!, // Changed from doctorProfile to doctorData
+        ),
       ),
-    );
-
-    if (result == true && mounted) {
-      _fetchDoctorProfile();
-    }
+    ).then((_) => _fetchDoctorProfile());
   }
 
-  void _navigateToAppointmentDetails() async {
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return;
-
-    final result = await Navigator.push(
+  void _navigateToAppointmentDetails() {
+    Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DoctorAppointmentDetailsScreen(doctorId: userId),
-      ),
-    );
-
-    if (result == true && mounted) {
-      await _fetchAppointmentDetails();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Appointment details updated successfully'),
-        ),
-      );
-    }
-  }
-
-  Widget _buildVerificationBanner() {
-    if (_doctorProfile == null) return const SizedBox.shrink();
-
-    // Only show banner for rejected applications
-    if (_doctorProfile!['rejected'] == true) {
-      Widget? actionButton;
-
-      if (_doctorProfile!['resubmission_allowed'] == true) {
-        actionButton = ElevatedButton(
-          onPressed: _navigateToResubmit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Update Application'),
-        );
-      }
-
-      return Container(
-        margin: const EdgeInsets.symmetric(vertical: 10),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.red.shade100,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.cancel, color: Colors.grey.shade800),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Your application was rejected',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            if (_doctorProfile!['rejection_reason'] != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  'Reason: ${_doctorProfile!['rejection_reason']}',
-                  style: const TextStyle(fontStyle: FontStyle.italic),
-                ),
-              ),
-            if (actionButton != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: actionButton,
-              ),
-          ],
-        ),
-      );
-    }
-
-    // Return empty widget for verified or pending applications
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildAppointmentDetailsCard() {
-    return _AppointmentDetailsCard(
-      appointmentDetails: _appointmentDetails,
-      appointmentLocations: _appointmentLocations,
-      buildDetailRow: _buildDetailRow,
-      onEditPressed: _navigateToAppointmentDetails,
-    );
-  }
-
-  Widget _buildMyAppointmentsCard() {
-    // Filter appointments for today only
-    final today = DateTime.now();
-    final todayString =
-        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    final todaysAppointments =
-        _doctorAppointments.where((appointment) {
-          return appointment['appointment_date'] == todayString;
-        }).toList();
-
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.today, color: Colors.blue.shade700),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Today\'s Appointments',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Text(
-                        '${todaysAppointments.length}',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, size: 20),
-                      onPressed: _fetchDoctorAppointments,
-                      tooltip: 'Refresh Appointments',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: 8),
-
-            _loadingDoctorAppointments
-                ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: CircularProgressIndicator(),
-                  ),
-                )
-                : todaysAppointments.isEmpty
-                ? Container(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.event_available,
-                        size: 48,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'No appointments for today',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 16,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatTodayDate(),
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-                : Column(
-                  children: [
-                    // Today's date header
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 8,
-                        horizontal: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _formatTodayDate(),
-                        style: TextStyle(
-                          color: Colors.blue.shade800,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Show only first 3 appointments
-                    ...todaysAppointments.take(3).map((appointment) {
-                      return _buildCollapsibleAppointmentTile(appointment);
-                    }),
-
-                    // Show "View More" if there are more than 3 today's appointments
-                    if (todaysAppointments.length > 3)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: TextButton.icon(
-                          onPressed:
-                              () => _showTodaysAppointmentsModal(
-                                todaysAppointments,
-                              ),
-                          icon: const Icon(Icons.visibility),
-                          label: Text(
-                            'View ${todaysAppointments.length - 3} More Today',
-                            style: TextStyle(
-                              color: Colors.blue.shade700,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    // View all appointments button (if there are appointments on other days)
-                    if (_doctorAppointments.length > todaysAppointments.length)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: TextButton.icon(
-                          onPressed: _showAllAppointmentsModal,
-                          icon: const Icon(Icons.calendar_month),
-                          label: Text(
-                            'View All ${_doctorAppointments.length} Appointments',
-                            style: TextStyle(
-                              color: Colors.blue.shade700,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-          ],
+        builder: (context) => DoctorAppointmentDetailsScreen(
+          doctorId: supabase.auth.currentUser!.id, // Added required doctorId parameter
+          // Removed appointmentDetails and appointmentLocations as they're not defined parameters
         ),
       ),
-    );
-  }
-
-  Widget _buildCollapsibleAppointmentTile(Map<String, dynamic> appointment) {
-    return StatefulBuilder(
-      builder: (context, setState) {
-        bool isExpanded = false;
-
-        Color statusColor;
-        switch (appointment['status']) {
-          case 'scheduled':
-            statusColor = Colors.blue;
-            break;
-          case 'completed':
-            statusColor = Colors.green;
-            break;
-          case 'cancelled':
-            statusColor = Colors.red;
-            break;
-          default:
-            statusColor = Colors.grey;
-        }
-
-        String patientName = 'Unknown';
-        if (appointment['users'] != null) {
-          patientName = appointment['users']['full_name'] ?? 'Unknown';
-        }
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          decoration: BoxDecoration(
-            border: Border(left: BorderSide(color: statusColor, width: 4)),
-            color: statusColor.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            children: [
-              // Main tile (always visible)
-              ListTile(
-                dense: true,
-                leading: Icon(Icons.person, color: statusColor, size: 20),
-                title: Text(
-                  patientName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                subtitle: Text(
-                  '${appointment['start_time']} - ${appointment['end_time']}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: statusColor),
-                      ),
-                      child: Text(
-                        appointment['status'].toString().toUpperCase(),
-                        style: TextStyle(
-                          color: statusColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        isExpanded ? Icons.expand_less : Icons.expand_more,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          isExpanded = !isExpanded;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              // Expanded content (shows when clicked)
-              if (isExpanded)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border(
-                      top: BorderSide(color: Colors.grey.shade200),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Appointment reason
-                      if (appointment['reason'] != null) ...[
-                        _buildExpandedDetailRow(
-                          'Reason',
-                          appointment['reason'],
-                        ),
-                        const SizedBox(height: 6),
-                      ],
-
-                      // Time
-                      _buildExpandedDetailRow(
-                        'Time',
-                        '${appointment['start_time']} - ${appointment['end_time']}',
-                      ),
-                      const SizedBox(height: 6),
-
-                      // Notes if any
-                      if (appointment['notes'] != null &&
-                          appointment['notes'].toString().isNotEmpty) ...[
-                        _buildExpandedDetailRow('Notes', appointment['notes']),
-                        const SizedBox(height: 6),
-                      ],
-
-                      // Created date
-                      _buildExpandedDetailRow(
-                        'Booked on',
-                        _formatDateTime(appointment['created_at']),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Action buttons
-                      Row(
-                        children: [
-                          if (appointment['status'] == 'scheduled') ...[
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed:
-                                    () => _updateAppointmentStatus(
-                                      appointment['id'],
-                                      'completed',
-                                    ),
-                                icon: const Icon(Icons.check, size: 16),
-                                label: const Text(
-                                  'Complete',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed:
-                                    () => _updateAppointmentStatus(
-                                      appointment['id'],
-                                      'cancelled',
-                                    ),
-                                icon: const Icon(Icons.cancel, size: 16),
-                                label: const Text(
-                                  'Cancel',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _showAddNotesDialog(appointment),
-                              icon: const Icon(Icons.note_add, size: 16),
-                              label: const Text(
-                                'Notes',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showTodaysAppointmentsModal(
-    List<Map<String, dynamic>> todaysAppointments,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder:
-          (context) => DraggableScrollableSheet(
-            initialChildSize: 0.6,
-            minChildSize: 0.4,
-            maxChildSize: 0.9,
-            expand: false,
-            builder: (context, scrollController) {
-              return Container(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Today\'s Appointments (${todaysAppointments.length})',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      _formatTodayDate(),
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: ListView.builder(
-                        controller: scrollController,
-                        itemCount: todaysAppointments.length,
-                        itemBuilder: (context, index) {
-                          final appointment = todaysAppointments[index];
-                          return _buildAppointmentModalTile(appointment);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-    );
-  }
-
-  // Helper method to build detail rows in expanded view
-  Widget _buildExpandedDetailRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 70,
-          child: Text(
-            '$label:',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 12, color: Colors.black87),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Helper method to format today's date
-  String _formatTodayDate() {
-    final today = DateTime.now();
-    final weekdays = [
-      'Sunday',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-    ];
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-
-    return '${weekdays[today.weekday % 7]}, ${today.day} ${months[today.month - 1]} ${today.year}';
-  }
-
-  // Helper method to format date time
-  String _formatDateTime(String? dateTimeString) {
-    if (dateTimeString == null) return 'Unknown';
-    try {
-      final dateTime = DateTime.parse(dateTimeString);
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return 'Invalid date';
-    }
-  }
-
-  Widget _buildDetailRow(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: Colors.teal, size: 20),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(
-            child: Text(value, style: TextStyle(color: Colors.grey.shade700)),
-          ),
-        ],
-      ),
-    );
+    ).then((_) => _fetchAppointmentDetails());
   }
 
   Widget _buildDoctorProfileInfo() {
@@ -1193,11 +215,14 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    _doctorProfile!['full_name'] ?? 'Doctor',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Text(
+                      _doctorProfile!['full_name'] ?? 'Doctor',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1297,6 +322,161 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     ),
                 ],
               ),
+              
+              // Professional Details Section
+              if (_doctorProfile!['verified'] == true && _appointmentDetails != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.teal.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Professional Details',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal.shade700,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.edit, color: Colors.teal.shade700, size: 20),
+                            onPressed: _navigateToAppointmentDetails,
+                            tooltip: 'Edit Professional Details',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Designation
+                      Row(
+                        children: [
+                          Icon(Icons.business_center, size: 18, color: Colors.teal.shade600),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Designation: ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              _appointmentDetails!['designation'] ?? 'Not set',
+                              style: TextStyle(
+                                color: Colors.grey.shade800,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Specialities
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.local_hospital, size: 18, color: Colors.teal.shade600),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Specialities: ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              _appointmentDetails!['specialities'] ?? 'Not set',
+                              style: TextStyle(
+                                color: Colors.grey.shade800,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Experience
+                      Row(
+                        children: [
+                          Icon(Icons.timeline, size: 18, color: Colors.teal.shade600),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Experience: ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '${_appointmentDetails!['experience'] ?? 0} years',
+                              style: TextStyle(
+                                color: Colors.grey.shade800,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (_doctorProfile!['verified'] == true && _appointmentDetails == null) ...[
+                // Show this when verified but no appointment details set up yet
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Professional Details',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.add, color: Colors.orange.shade700, size: 20),
+                            onPressed: _navigateToAppointmentDetails,
+                            tooltip: 'Add Professional Details',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Please set up your professional details to complete your profile',
+                        style: TextStyle(
+                          color: Colors.orange.shade600,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1317,43 +497,130 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           const SizedBox(height: 20),
           _buildAppointmentDetailsCard(),
           const SizedBox(height: 10),
-          _buildMyAppointmentsCard(),
-          const SizedBox(height: 10),
         ],
+      ],
+    );
+  }
 
-        if (_doctorProfile!['verified'] == true)
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 15),
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _navigateToAppointmentDetails,
-              icon: const Icon(Icons.calendar_month),
-              label: const Text(
-                'Edit Appointment Details',
-                style: TextStyle(fontSize: 16),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+  Widget _buildVerificationBanner() {
+    if (_doctorProfile == null) return const SizedBox.shrink();
+
+    // Only show banner for rejected applications
+    if (_doctorProfile!['rejected'] == true) {
+      Widget? actionButton;
+
+      if (_doctorProfile!['resubmission_allowed'] == true) {
+        actionButton = ElevatedButton(
+          onPressed: _navigateToResubmit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Update Application'),
+        );
+      }
+
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.red.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.cancel, color: Colors.grey.shade800),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Your application was rejected',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            if (_doctorProfile!['rejection_reason'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Reason: ${_doctorProfile!['rejection_reason']}',
+                  style: const TextStyle(fontStyle: FontStyle.italic),
                 ),
               ),
+            if (actionButton != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: actionButton,
+              ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildAppointmentDetailsCard() {
+    if (_loadingAppointmentDetails) {
+      return Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: const Padding(
+          padding: EdgeInsets.all(40),
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
+    return _AppointmentDetailsCard(
+      appointmentDetails: _appointmentDetails,
+      appointmentLocations: _appointmentLocations,
+      buildDetailRow: _buildDetailRow,
+      onEditPressed: _navigateToAppointmentDetails,
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.teal, size: 20),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-      ],
+          Expanded(
+            child: Text(value, style: TextStyle(color: Colors.grey.shade700)),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildInfoTile(IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, color: Colors.teal),
-          const SizedBox(width: 15),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 16))),
+          Icon(icon, size: 20, color: Colors.teal),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
         ],
       ),
     );
@@ -1371,6 +638,11 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               const SnackBar(content: Text('Notifications coming soon')),
             );
           },
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout),
+          onPressed: _logout,
+          tooltip: 'Logout',
         ),
       ],
       body: RefreshIndicator(
@@ -1394,13 +666,12 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child:
-                      _isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : SingleChildScrollView(
-                            child: _buildDoctorProfileInfo(),
-                          ),
+                  padding: const EdgeInsets.all(16),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                          child: _buildDoctorProfileInfo(),
+                        ),
                 ),
               ),
             ),
