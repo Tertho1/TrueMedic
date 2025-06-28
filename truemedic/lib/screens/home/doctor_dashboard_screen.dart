@@ -114,9 +114,9 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -140,9 +140,11 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DoctorResubmitScreen(
-          doctorData: _doctorProfile!, // Changed from doctorProfile to doctorData
-        ),
+        builder:
+            (context) => DoctorResubmitScreen(
+              doctorData:
+                  _doctorProfile!, // Changed from doctorProfile to doctorData
+            ),
       ),
     ).then((_) => _fetchDoctorProfile());
   }
@@ -151,12 +153,287 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DoctorAppointmentDetailsScreen(
-          doctorId: supabase.auth.currentUser!.id, // Added required doctorId parameter
-          // Removed appointmentDetails and appointmentLocations as they're not defined parameters
-        ),
+        builder:
+            (context) => DoctorAppointmentDetailsScreen(
+              doctorId:
+                  supabase
+                      .auth
+                      .currentUser!
+                      .id, // Added required doctorId parameter
+              // Removed appointmentDetails and appointmentLocations as they're not defined parameters
+            ),
       ),
     ).then((_) => _fetchAppointmentDetails());
+  }
+
+  // Add this method to show today's schedule based on appointment locations
+  Widget _buildTodaysScheduleCard() {
+    final today = DateTime.now();
+    final dayName = _getDayName(today.weekday);
+
+    // Filter locations that are available today
+    final todaysLocations =
+        _appointmentLocations.where((location) {
+          final availableDays =
+              (location['available_days'] as List<dynamic>?) ?? [];
+          return availableDays.contains(dayName);
+        }).toList();
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.today, color: Colors.blue.shade700),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Today\'s Schedule',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Text(
+                    '${todaysLocations.length} locations',
+                    style: TextStyle(
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 8),
+
+            todaysLocations.isEmpty
+                ? Container(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.event_available,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No appointments scheduled for today',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTodayDate(),
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+                : Column(
+                  children: [
+                    // Today's date header
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _formatTodayDate(),
+                        style: TextStyle(
+                          color: Colors.blue.shade800,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Show today's locations
+                    ...todaysLocations.map((location) {
+                      return _buildTodaysLocationTile(location);
+                    }),
+                  ],
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodaysLocationTile(Map<String, dynamic> location) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Location name
+          Row(
+            children: [
+              Icon(Icons.location_on, color: Colors.blue.shade700, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  location['location_name'] ?? 'Unknown Location',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Address
+          if (location['address'] != null)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.place, size: 16, color: Colors.grey.shade600),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    location['address'],
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  ),
+                ),
+              ],
+            ),
+
+          const SizedBox(height: 6),
+
+          // Time and duration info
+          Row(
+            children: [
+              Icon(Icons.access_time, size: 16, color: Colors.blue.shade600),
+              const SizedBox(width: 4),
+              Text(
+                '${location['start_time']} - ${location['end_time']}',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.blue.shade800,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Icon(Icons.timer, size: 16, color: Colors.blue.shade600),
+              const SizedBox(width: 4),
+              Text(
+                '${location['appointment_duration']}min slots',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          // Max appointments info
+          Row(
+            children: [
+              Icon(Icons.event, size: 16, color: Colors.blue.shade600),
+              const SizedBox(width: 4),
+              Text(
+                'Up to ${location['max_appointments_per_day']} appointments today',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              ),
+            ],
+          ),
+
+          // Contact number if available
+          if (location['contact_number'] != null &&
+              location['contact_number'].toString().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.phone, size: 16, color: Colors.blue.shade600),
+                const SizedBox(width: 4),
+                Text(
+                  location['contact_number'],
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Helper method to get day name from weekday number
+  String _getDayName(int weekday) {
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    return days[weekday - 1];
+  }
+
+  // Helper method to format today's date
+  String _formatTodayDate() {
+    final today = DateTime.now();
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    return '${_getDayName(today.weekday)}, ${today.day} ${months[today.month - 1]} ${today.year}';
   }
 
   Widget _buildDoctorProfileInfo() {
@@ -322,9 +599,10 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     ),
                 ],
               ),
-              
+
               // Professional Details Section
-              if (_doctorProfile!['verified'] == true && _appointmentDetails != null) ...[
+              if (_doctorProfile!['verified'] == true &&
+                  _appointmentDetails != null) ...[
                 const SizedBox(height: 16),
                 Container(
                   width: double.infinity,
@@ -348,18 +626,26 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                             ),
                           ),
                           IconButton(
-                            icon: Icon(Icons.edit, color: Colors.teal.shade700, size: 20),
+                            icon: Icon(
+                              Icons.edit,
+                              color: Colors.teal.shade700,
+                              size: 20,
+                            ),
                             onPressed: _navigateToAppointmentDetails,
                             tooltip: 'Edit Professional Details',
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Designation
                       Row(
                         children: [
-                          Icon(Icons.business_center, size: 18, color: Colors.teal.shade600),
+                          Icon(
+                            Icons.business_center,
+                            size: 18,
+                            color: Colors.teal.shade600,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Designation: ',
@@ -380,12 +666,16 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Specialities
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.local_hospital, size: 18, color: Colors.teal.shade600),
+                          Icon(
+                            Icons.local_hospital,
+                            size: 18,
+                            color: Colors.teal.shade600,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Specialities: ',
@@ -406,11 +696,15 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Experience
                       Row(
                         children: [
-                          Icon(Icons.timeline, size: 18, color: Colors.teal.shade600),
+                          Icon(
+                            Icons.timeline,
+                            size: 18,
+                            color: Colors.teal.shade600,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Experience: ',
@@ -433,7 +727,8 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     ],
                   ),
                 ),
-              ] else if (_doctorProfile!['verified'] == true && _appointmentDetails == null) ...[
+              ] else if (_doctorProfile!['verified'] == true &&
+                  _appointmentDetails == null) ...[
                 // Show this when verified but no appointment details set up yet
                 const SizedBox(height: 16),
                 Container(
@@ -458,7 +753,11 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                             ),
                           ),
                           IconButton(
-                            icon: Icon(Icons.add, color: Colors.orange.shade700, size: 20),
+                            icon: Icon(
+                              Icons.add,
+                              color: Colors.orange.shade700,
+                              size: 20,
+                            ),
                             onPressed: _navigateToAppointmentDetails,
                             tooltip: 'Add Professional Details',
                           ),
@@ -496,6 +795,8 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         if (_doctorProfile!['verified'] == true) ...[
           const SizedBox(height: 20),
           _buildAppointmentDetailsCard(),
+          const SizedBox(height: 10),
+          _buildTodaysScheduleCard(), // Add this line
           const SizedBox(height: 10),
         ],
       ],
@@ -570,9 +871,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: const Padding(
           padding: EdgeInsets.all(40),
-          child: Center(
-            child: CircularProgressIndicator(),
-          ),
+          child: Center(child: CircularProgressIndicator()),
         ),
       );
     }
@@ -615,12 +914,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         children: [
           Icon(icon, size: 20, color: Colors.teal),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );
@@ -667,11 +961,12 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : SingleChildScrollView(
-                          child: _buildDoctorProfileInfo(),
-                        ),
+                  child:
+                      _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : SingleChildScrollView(
+                            child: _buildDoctorProfileInfo(),
+                          ),
                 ),
               ),
             ),
