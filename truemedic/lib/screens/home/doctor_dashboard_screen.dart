@@ -365,6 +365,30 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               ),
             ],
           ),
+          
+          // Address - ADD THIS SECTION
+          if (location['address'] != null && location['address'].toString().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.place, size: 14, color: Colors.grey.shade600),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    location['address'],
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade700,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          
           const SizedBox(height: 6),
           
           // Compact info in one row
@@ -385,6 +409,25 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               ),
             ],
           ),
+          
+          // Contact number if available - ADD THIS SECTION
+          if (location['contact_number'] != null &&
+              location['contact_number'].toString().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.phone, size: 14, color: Colors.blue.shade600),
+                const SizedBox(width: 4),
+                Text(
+                  location['contact_number'],
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1475,6 +1518,30 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                 ),
               ],
             ),
+            
+            // Address - ADD THIS SECTION
+            if (location['address'] != null && location['address'].toString().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.place, size: 12, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      location['address'],
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            
             const SizedBox(height: 4),
             
             // Compact info row
@@ -1502,6 +1569,25 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                 ),
               ],
             ),
+            
+            // Contact number if available - ADD THIS SECTION
+            if (location['contact_number'] != null &&
+                location['contact_number'].toString().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.phone, size: 12, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    location['contact_number'],
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1620,7 +1706,10 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                 Expanded(
                   child: Text(
                     location['address'],
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade700,
+                    ),
                   ),
                 ),
               ],
@@ -1646,7 +1735,10 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
               const SizedBox(width: 4),
               Text(
                 '${location['appointment_duration']}min slots',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                ),
               ),
             ],
           ),
@@ -1660,7 +1752,10 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
               const SizedBox(width: 4),
               Text(
                 'Max ${location['max_appointments_per_day']} appointments/day',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                ),
               ),
             ],
           ),
