@@ -17,32 +17,19 @@ class _DoctorAppointmentDetailsScreenState
   final _formKey = GlobalKey<FormState>();
   final supabase = Supabase.instance.client;
 
-  // Main form controllers
-  final _designationController = TextEditingController();
-  final _specialitiesController = TextEditingController();
-  final _experienceController = TextEditingController();
-
-  // Available days
-  final List<String> _daysOfWeek = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ];
-
-  // Store days per location
-  Map<int, Set<String>> _locationDays = {};
-
-  // Locations - using Map instead of custom class
-  List<Map<String, dynamic>> _appointmentLocations = [];
-
   // Loading state
   bool _isLoading = true;
   bool _isSaving = false;
   String? _doctorAppointmentId;
+
+  // ADD THESE MISSING VARIABLES:
+  List<Map<String, dynamic>> _appointmentLocations = [];
+  Map<int, Set<String>> _locationDays = {};
+  
+  // Days of the week constant
+  final List<String> _daysOfWeek = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+  ];
 
   @override
   void initState() {
@@ -52,9 +39,6 @@ class _DoctorAppointmentDetailsScreenState
 
   @override
   void dispose() {
-    _designationController.dispose();
-    _specialitiesController.dispose();
-    _experienceController.dispose();
     super.dispose();
   }
 
@@ -73,12 +57,15 @@ class _DoctorAppointmentDetailsScreenState
         // Store the appointment ID
         _doctorAppointmentId = response['id'];
 
-        // Populate the main form with existing data
+        // Remove this section - we don't load professional details anymore
+        // DELETE THIS BLOCK:
+        /*
         setState(() {
           _designationController.text = response['designation'] ?? '';
           _specialitiesController.text = response['specialities'] ?? '';
           _experienceController.text = response['experience']?.toString() ?? '';
         });
+        */
 
         // Fetch location data
         await _fetchAppointmentLocations(_doctorAppointmentId!);
@@ -211,7 +198,9 @@ class _DoctorAppointmentDetailsScreenState
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
 
-      // Save or update doctor_appointments (without available_days)
+      // Remove this section - we don't save professional details anymore
+      // DELETE THIS BLOCK:
+      /*
       final appointmentData = {
         'doctor_id': userId,
         'designation': _designationController.text,
@@ -219,18 +208,21 @@ class _DoctorAppointmentDetailsScreenState
         'experience': int.tryParse(_experienceController.text) ?? 0,
         'updated_at': DateTime.now().toIso8601String(),
       };
+      */
 
+      // Get or create doctor_appointments record (only for locations)
       Map<String, dynamic> doctorAppointment;
       if (_doctorAppointmentId != null) {
-        await supabase
-            .from('doctor_appointments')
-            .update(appointmentData)
-            .eq('id', _doctorAppointmentId!);
+        // Just use existing appointment ID
         doctorAppointment = {'id': _doctorAppointmentId};
       } else {
+        // Create minimal appointment record if it doesn't exist
         doctorAppointment = await supabase
             .from('doctor_appointments')
-            .insert(appointmentData)
+            .insert({
+              'doctor_id': userId,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
             .select()
             .single();
         _doctorAppointmentId = doctorAppointment['id'];
@@ -256,13 +248,13 @@ class _DoctorAppointmentDetailsScreenState
           'end_time': location['end_time'],
           'max_appointments_per_day': location['max_appointments_per_day'],
           'appointment_duration': location['appointment_duration'],
-          'available_days': locationDays, // Save days per location
+          'available_days': locationDays,
         });
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Appointment details saved successfully')),
+          const SnackBar(content: Text('Appointment locations saved successfully')),
         );
         Navigator.pop(context, true);
       }
@@ -281,10 +273,17 @@ class _DoctorAppointmentDetailsScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Appointment Details'),
+        title: const Text('Appointment Locations'),
         centerTitle: true,
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_location),
+            onPressed: _addNewLocation,
+            tooltip: 'Add Location',
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -297,53 +296,6 @@ class _DoctorAppointmentDetailsScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Professional Details Section
-                        _buildSectionHeader('Professional Details'),
-                        _buildTextField(
-                          controller: _designationController,
-                          label: 'Designation',
-                          hint: 'e.g., Senior Consultant, Assistant Professor',
-                          icon: Icons.business_center,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your designation';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _specialitiesController,
-                          label: 'Specialities',
-                          hint: 'e.g., Cardiology, Neurology',
-                          icon: Icons.local_hospital,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your specialities';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _experienceController,
-                          label: 'Experience (years)',
-                          hint: 'e.g., 5',
-                          icon: Icons.timeline,
-                          keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your years of experience';
-                            }
-                            if (int.tryParse(value) == null) {
-                              return 'Please enter a valid number';
-                            }
-                            return null;
-                          },
-                        ),
-
-                        const SizedBox(height: 24),
-
                         // Appointment Locations
                         _buildSectionHeader('Appointment Locations'),
 
@@ -353,20 +305,6 @@ class _DoctorAppointmentDetailsScreenState
                           final location = entry.value;
                           return _buildLocationCard(location, index);
                         }),
-
-                        // Add location button
-                        const SizedBox(height: 16),
-                        Center(
-                          child: ElevatedButton.icon(
-                            onPressed: _addNewLocation,
-                            icon: const Icon(Icons.add_location),
-                            label: const Text('Add Another Location'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.teal.shade100,
-                              foregroundColor: Colors.teal.shade800,
-                            ),
-                          ),
-                        ),
 
                         const SizedBox(height: 32),
 
@@ -386,7 +324,7 @@ class _DoctorAppointmentDetailsScreenState
                             child: Text(
                               _isSaving
                                   ? 'Saving...'
-                                  : 'Save Appointment Details',
+                                  : 'Save Appointment Locations', // Updated text
                             ),
                           ),
                         ),
@@ -507,7 +445,7 @@ class _DoctorAppointmentDetailsScreenState
                 prefixIcon: Icon(Icons.phone),
               ),
               onChanged: (value) => location['contact_number'] = value,
-            ),
+        ),
             const SizedBox(height: 12),
 
             // Time Row
