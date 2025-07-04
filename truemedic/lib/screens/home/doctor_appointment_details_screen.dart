@@ -640,8 +640,10 @@ class _DoctorAppointmentDetailsScreenState
     String initialTime,
     ValueChanged<String> onChanged,
   ) {
-    // Create a controller that will be updated when time changes
-    final controller = TextEditingController(text: initialTime);
+    // Create a controller that displays 12-hour format but stores 24-hour format
+    final controller = TextEditingController(
+      text: _formatTime12Hour(initialTime),
+    );
 
     return TextFormField(
       decoration: InputDecoration(
@@ -655,16 +657,25 @@ class _DoctorAppointmentDetailsScreenState
         final TimeOfDay? picked = await showTimePicker(
           context: context,
           initialTime: _parseTimeOfDay(initialTime),
+          builder: (context, child) {
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                alwaysUse24HourFormat: false, // Force 12-hour format in picker
+              ),
+              child: child!,
+            );
+          },
         );
         if (picked != null) {
-          final String formattedTime =
+          // Store in 24-hour format
+          final String formattedTime24 =
               '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
 
-          // Update the controller text immediately
-          controller.text = formattedTime;
+          // Display in 12-hour format
+          controller.text = _formatTime12Hour(formattedTime24);
 
-          // Call the onChanged callback
-          onChanged(formattedTime);
+          // Call the onChanged callback with 24-hour format (for storage)
+          onChanged(formattedTime24);
 
           // Trigger rebuild to show the updated time
           setState(() {});
@@ -722,5 +733,20 @@ class _DoctorAppointmentDetailsScreenState
             );
           }).toList(),
     );
+  }
+
+  String _formatTime12Hour(String time24) {
+    try {
+      final parts = time24.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final hour12 = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+
+      return '$hour12:${minute.toString().padLeft(2, '0')} $period';
+    } catch (e) {
+      return time24;
+    }
   }
 }
