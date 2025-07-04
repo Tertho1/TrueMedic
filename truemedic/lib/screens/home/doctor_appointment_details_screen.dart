@@ -16,7 +16,7 @@ class _DoctorAppointmentDetailsScreenState
     extends State<DoctorAppointmentDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
   final supabase = Supabase.instance.client;
-  
+
   // ADD THIS LINE:
   final ScrollController _scrollController = ScrollController();
 
@@ -28,10 +28,16 @@ class _DoctorAppointmentDetailsScreenState
   // ADD THESE MISSING VARIABLES:
   List<Map<String, dynamic>> _appointmentLocations = [];
   Map<int, Set<String>> _locationDays = {};
-  
+
   // Days of the week constant
   final List<String> _daysOfWeek = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 
   @override
@@ -51,11 +57,12 @@ class _DoctorAppointmentDetailsScreenState
 
     try {
       // Try to get existing appointment details
-      final response = await supabase
-          .from('doctor_appointments')
-          .select()
-          .eq('doctor_id', widget.doctorId)
-          .maybeSingle();
+      final response =
+          await supabase
+              .from('doctor_appointments')
+              .select()
+              .eq('doctor_id', widget.doctorId)
+              .maybeSingle();
 
       if (response != null) {
         // Store the appointment ID
@@ -100,7 +107,7 @@ class _DoctorAppointmentDetailsScreenState
         'appointment_duration': 15,
         'available_days': <String>[],
       });
-      
+
       // Initialize empty days set for new location
       _locationDays[_appointmentLocations.length - 1] = <String>{};
     });
@@ -114,19 +121,24 @@ class _DoctorAppointmentDetailsScreenState
           .eq('doctor_appointment_id', appointmentId);
 
       setState(() {
-        _appointmentLocations = List<Map<String, dynamic>>.from(locationsResponse);
-        
+        _appointmentLocations = List<Map<String, dynamic>>.from(
+          locationsResponse,
+        );
+
         // Initialize location days from database
         _locationDays.clear();
         for (int i = 0; i < _appointmentLocations.length; i++) {
-          final locationDays = _appointmentLocations[i]['available_days'] as List<dynamic>?;
+          final locationDays =
+              _appointmentLocations[i]['available_days'] as List<dynamic>?;
           if (locationDays != null) {
-            _locationDays[i] = Set<String>.from(locationDays.map((day) => day.toString()));
+            _locationDays[i] = Set<String>.from(
+              locationDays.map((day) => day.toString()),
+            );
           } else {
             _locationDays[i] = <String>{};
           }
         }
-        
+
         // If no locations exist, add one empty location
         if (_appointmentLocations.isEmpty) {
           _addEmptyLocation();
@@ -152,19 +164,19 @@ class _DoctorAppointmentDetailsScreenState
         'appointment_duration': 15,
         'available_days': <String>[],
       });
-      
+
       // Initialize empty days set for new location
       _locationDays[_appointmentLocations.length - 1] = <String>{};
     });
 
     // Wait for the widget to rebuild, then scroll to the new location
     await Future.delayed(const Duration(milliseconds: 100));
-    
+
     if (mounted) {
       // Calculate the approximate position of the new location card
       // Each card is approximately 600 pixels tall (including margins)
       final double targetPosition = (_appointmentLocations.length - 1) * 600.0;
-      
+
       // Scroll to the new location with animation
       _scrollController.animateTo(
         targetPosition,
@@ -179,7 +191,7 @@ class _DoctorAppointmentDetailsScreenState
       setState(() {
         _appointmentLocations.removeAt(index);
         _locationDays.remove(index);
-        
+
         // Reindex the remaining location days
         Map<int, Set<String>> newLocationDays = {};
         for (int i = 0; i < _appointmentLocations.length; i++) {
@@ -206,7 +218,22 @@ class _DoctorAppointmentDetailsScreenState
       final locationDays = _locationDays[i] ?? <String>{};
       if (locationDays.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please select available days for Location ${i + 1}')),
+          SnackBar(
+            content: Text('Please select available days for Location ${i + 1}'),
+          ),
+        );
+        return;
+      }
+
+      // Validate time ranges
+      final location = _appointmentLocations[i];
+      final timeValidationError = _validateTimeRange(location);
+      if (timeValidationError != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Location ${i + 1}: $timeValidationError'),
+            backgroundColor: Colors.red,
+          ),
         );
         return;
       }
@@ -237,14 +264,15 @@ class _DoctorAppointmentDetailsScreenState
         doctorAppointment = {'id': _doctorAppointmentId};
       } else {
         // Create minimal appointment record if it doesn't exist
-        doctorAppointment = await supabase
-            .from('doctor_appointments')
-            .insert({
-              'doctor_id': userId,
-              'updated_at': DateTime.now().toIso8601String(),
-            })
-            .select()
-            .single();
+        doctorAppointment =
+            await supabase
+                .from('doctor_appointments')
+                .insert({
+                  'doctor_id': userId,
+                  'updated_at': DateTime.now().toIso8601String(),
+                })
+                .select()
+                .single();
         _doctorAppointmentId = doctorAppointment['id'];
       }
 
@@ -258,7 +286,7 @@ class _DoctorAppointmentDetailsScreenState
       for (int i = 0; i < _appointmentLocations.length; i++) {
         final location = _appointmentLocations[i];
         final locationDays = _locationDays[i]?.toList() ?? [];
-        
+
         await supabase.from('appointment_locations').insert({
           'doctor_appointment_id': _doctorAppointmentId!,
           'location_name': location['location_name'],
@@ -274,19 +302,39 @@ class _DoctorAppointmentDetailsScreenState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Appointment locations saved successfully')),
+          const SnackBar(
+            content: Text('Appointment locations saved successfully'),
+          ),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  String? _validateTimeRange(Map<String, dynamic> location) {
+    final startTime = location['start_time'] as String;
+    final endTime = location['end_time'] as String;
+
+    final start = _parseTimeOfDay(startTime);
+    final end = _parseTimeOfDay(endTime);
+
+    // Convert to minutes for easy comparison
+    final startMinutes = start.hour * 60 + start.minute;
+    final endMinutes = end.hour * 60 + end.minute;
+
+    if (startMinutes >= endMinutes) {
+      return 'End time must be after start time';
+    }
+
+    return null;
   }
 
   @override
@@ -310,49 +358,49 @@ class _DoctorAppointmentDetailsScreenState
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
-                  controller: _scrollController, // Add this line
-                  padding: const EdgeInsets.all(16),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Appointment Locations
-                        _buildSectionHeader('Appointment Locations'),
+                controller: _scrollController, // Add this line
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Appointment Locations
+                      _buildSectionHeader('Appointment Locations'),
 
-                        // List of location forms
-                        ..._appointmentLocations.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final location = entry.value;
-                          return _buildLocationCard(location, index);
-                        }),
+                      // List of location forms
+                      ..._appointmentLocations.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final location = entry.value;
+                        return _buildLocationCard(location, index);
+                      }),
 
-                        const SizedBox(height: 32),
+                      const SizedBox(height: 32),
 
-                        // Save button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isSaving ? null : _saveAppointmentDetails,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.teal,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 15),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: Text(
-                              _isSaving
-                                  ? 'Saving...'
-                                  : 'Save Appointment Locations', // Updated text
+                      // Save button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isSaving ? null : _saveAppointmentDetails,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
                             ),
                           ),
+                          child: Text(
+                            _isSaving
+                                ? 'Saving...'
+                                : 'Save Appointment Locations', // Updated text
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
           if (_isSaving) const LoadingIndicator(),
         ],
       ),
@@ -438,7 +486,11 @@ class _DoctorAppointmentDetailsScreenState
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.business),
               ),
-              validator: (value) => value?.isEmpty ?? true ? 'Location name is required' : null,
+              validator:
+                  (value) =>
+                      value?.isEmpty ?? true
+                          ? 'Location name is required'
+                          : null,
               onChanged: (value) => location['location_name'] = value,
             ),
             const SizedBox(height: 12),
@@ -451,7 +503,9 @@ class _DoctorAppointmentDetailsScreenState
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.location_on),
               ),
-              validator: (value) => value?.isEmpty ?? true ? 'Address is required' : null,
+              validator:
+                  (value) =>
+                      value?.isEmpty ?? true ? 'Address is required' : null,
               onChanged: (value) => location['address'] = value,
               maxLines: 2,
             ),
@@ -466,26 +520,48 @@ class _DoctorAppointmentDetailsScreenState
                 prefixIcon: Icon(Icons.phone),
               ),
               onChanged: (value) => location['contact_number'] = value,
-        ),
+            ),
             const SizedBox(height: 12),
 
-            // Time Row
+            // Time Row with validation
             Row(
               children: [
                 Expanded(
-                  child: _buildTimeField(
-                    'Start Time',
-                    location['start_time'],
-                    (time) => location['start_time'] = time,
-                  ),
+                  child: _buildTimeField('Start Time', location['start_time'], (
+                    time,
+                  ) {
+                    location['start_time'] = time;
+                    // Validate time range after update
+                    final validationError = _validateTimeRange(location);
+                    if (validationError != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(validationError),
+                          backgroundColor: Colors.orange,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  }),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _buildTimeField(
-                    'End Time',
-                    location['end_time'],
-                    (time) => location['end_time'] = time,
-                  ),
+                  child: _buildTimeField('End Time', location['end_time'], (
+                    time,
+                  ) {
+                    location['end_time'] = time;
+                    // Validate time range after update
+                    final validationError = _validateTimeRange(location);
+                    if (validationError != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(validationError),
+                          backgroundColor: Colors.orange,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  }),
                 ),
               ],
             ),
@@ -496,7 +572,8 @@ class _DoctorAppointmentDetailsScreenState
               children: [
                 Expanded(
                   child: TextFormField(
-                    initialValue: location['max_appointments_per_day'].toString(),
+                    initialValue:
+                        location['max_appointments_per_day'].toString(),
                     decoration: const InputDecoration(
                       labelText: 'Max Appointments/Day',
                       border: OutlineInputBorder(),
@@ -505,10 +582,14 @@ class _DoctorAppointmentDetailsScreenState
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       if (value?.isEmpty ?? true) return 'Required';
-                      if (int.tryParse(value!) == null) return 'Must be a number';
+                      if (int.tryParse(value!) == null)
+                        return 'Must be a number';
                       return null;
                     },
-                    onChanged: (value) => location['max_appointments_per_day'] = int.tryParse(value) ?? 20,
+                    onChanged:
+                        (value) =>
+                            location['max_appointments_per_day'] =
+                                int.tryParse(value) ?? 20,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -523,10 +604,14 @@ class _DoctorAppointmentDetailsScreenState
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       if (value?.isEmpty ?? true) return 'Required';
-                      if (int.tryParse(value!) == null) return 'Must be a number';
+                      if (int.tryParse(value!) == null)
+                        return 'Must be a number';
                       return null;
                     },
-                    onChanged: (value) => location['appointment_duration'] = int.tryParse(value) ?? 15,
+                    onChanged:
+                        (value) =>
+                            location['appointment_duration'] =
+                                int.tryParse(value) ?? 15,
                   ),
                 ),
               ],
@@ -550,7 +635,14 @@ class _DoctorAppointmentDetailsScreenState
     );
   }
 
-  Widget _buildTimeField(String label, String initialTime, ValueChanged<String> onChanged) {
+  Widget _buildTimeField(
+    String label,
+    String initialTime,
+    ValueChanged<String> onChanged,
+  ) {
+    // Create a controller that will be updated when time changes
+    final controller = TextEditingController(text: initialTime);
+
     return TextFormField(
       decoration: InputDecoration(
         labelText: label,
@@ -558,51 +650,77 @@ class _DoctorAppointmentDetailsScreenState
         prefixIcon: const Icon(Icons.access_time),
       ),
       readOnly: true,
-      controller: TextEditingController(text: initialTime),
+      controller: controller,
       onTap: () async {
         final TimeOfDay? picked = await showTimePicker(
           context: context,
-          initialTime: TimeOfDay.now(),
+          initialTime: _parseTimeOfDay(initialTime),
         );
         if (picked != null) {
-          final String formattedTime = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+          final String formattedTime =
+              '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+
+          // Update the controller text immediately
+          controller.text = formattedTime;
+
+          // Call the onChanged callback
           onChanged(formattedTime);
+
+          // Trigger rebuild to show the updated time
+          setState(() {});
         }
+      },
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Time is required';
+        }
+        return null;
       },
     );
   }
 
+  // Helper method to parse time string to TimeOfDay
+  TimeOfDay _parseTimeOfDay(String timeString) {
+    try {
+      final parts = timeString.split(':');
+      return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    } catch (e) {
+      return TimeOfDay.now();
+    }
+  }
+
   Widget _buildLocationDaysSelector(int locationIndex) {
     final selectedDays = _locationDays[locationIndex] ?? <String>{};
-    
+
     return Wrap(
       spacing: 8,
-      children: _daysOfWeek.map((day) {
-        final isSelected = selectedDays.contains(day);
-        return FilterChip(
-          label: Text(day),
-          selected: isSelected,
-          onSelected: (selected) {
-            setState(() {
-              if (!_locationDays.containsKey(locationIndex)) {
-                _locationDays[locationIndex] = <String>{};
-              }
-              
-              if (selected) {
-                _locationDays[locationIndex]!.add(day);
-              } else {
-                _locationDays[locationIndex]!.remove(day);
-              }
-              
-              // Update the location data
-              _appointmentLocations[locationIndex]['available_days'] = 
-                  _locationDays[locationIndex]!.toList();
-            });
-          },
-          selectedColor: Colors.teal.shade200,
-          backgroundColor: Colors.grey.shade200,
-        );
-      }).toList(),
+      children:
+          _daysOfWeek.map((day) {
+            final isSelected = selectedDays.contains(day);
+            return FilterChip(
+              label: Text(day),
+              selected: isSelected,
+              onSelected: (selected) {
+                setState(() {
+                  if (!_locationDays.containsKey(locationIndex)) {
+                    _locationDays[locationIndex] = <String>{};
+                  }
+
+                  if (selected) {
+                    _locationDays[locationIndex]!.add(day);
+                  } else {
+                    _locationDays[locationIndex]!.remove(day);
+                  }
+
+                  // Update the location data
+                  _appointmentLocations[locationIndex]['available_days'] =
+                      _locationDays[locationIndex]!.toList();
+                });
+              },
+              selectedColor: Colors.teal.shade200,
+              backgroundColor: Colors.grey.shade200,
+            );
+          }).toList(),
     );
   }
 }
