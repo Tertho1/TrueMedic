@@ -1893,120 +1893,187 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
   }
 
   Widget _buildLocationTile(Map<String, dynamic> location) {
-    final availableDays = (location['available_days'] as List<dynamic>?) ?? [];
+  final availableDays = (location['available_days'] as List<dynamic>?) ?? [];
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Location name and basic info in compact form
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    location['location_name'] ?? 'Unknown Location',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: Colors.teal,
-                    ),
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Location name and basic info in compact form
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  location['location_name'] ?? 'Unknown Location',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.teal,
                   ),
                 ),
+              ),
+              Text(
+                '${location['start_time']} - ${location['end_time']}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+
+          // Address
+          if (location['address'] != null &&
+              location['address'].toString().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.place, size: 12, color: Colors.grey.shade600),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    location['address'],
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 4),
+
+          // Compact info row
+          Row(
+            children: [
+              Icon(Icons.timer, size: 14, color: Colors.grey.shade600),
+              const SizedBox(width: 4),
+              Text(
+                '${location['appointment_duration']}min',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+              const SizedBox(width: 12),
+              Icon(Icons.event, size: 14, color: Colors.grey.shade600),
+              const SizedBox(width: 4),
+              Text(
+                'Max ${location['max_appointments_per_day']}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+              const SizedBox(width: 12),
+              Icon(
+                Icons.calendar_today,
+                size: 14,
+                color: Colors.grey.shade600,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '${availableDays.length} days',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+
+          // Available days - THIS IS THE MISSING SECTION
+          if (availableDays.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade600),
+                const SizedBox(width: 4),
                 Text(
-                  '${location['start_time']} - ${location['end_time']}',
+                  'Days: ',
                   style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
+                Expanded(
+                  child: Wrap(
+                    spacing: 3,
+                    runSpacing: 2,
+                    children: availableDays.take(3).map((day) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.teal.shade300),
+                      ),
+                      child: Text(
+                        day.toString().substring(0, 3), // Show first 3 letters
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.teal.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    )).toList(),
+                  ),
+                ),
+                if (availableDays.length > 3)
+                  Text(
+                    '+${availableDays.length - 3} more',
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: Colors.grey.shade600,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
               ],
             ),
-
-            // Address - ADD THIS SECTION
-            if (location['address'] != null &&
-                location['address'].toString().isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ] else
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
                 children: [
-                  Icon(Icons.place, size: 12, color: Colors.grey.shade600),
+                  Icon(Icons.calendar_today, size: 12, color: Colors.orange.shade600),
                   const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      location['address'],
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  Text(
+                    'No days selected',
+                    style: TextStyle(
+                      color: Colors.orange.shade600,
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ],
               ),
-            ],
+            ),
 
+          // Contact number if available
+          if (location['contact_number'] != null &&
+              location['contact_number'].toString().isNotEmpty) ...[
             const SizedBox(height: 4),
-
-            // Compact info row
             Row(
               children: [
-                Icon(Icons.timer, size: 14, color: Colors.grey.shade600),
+                Icon(Icons.phone, size: 12, color: Colors.grey.shade600),
                 const SizedBox(width: 4),
                 Text(
-                  '${location['appointment_duration']}min',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                ),
-                const SizedBox(width: 12),
-                Icon(Icons.event, size: 14, color: Colors.grey.shade600),
-                const SizedBox(width: 4),
-                Text(
-                  'Max ${location['max_appointments_per_day']}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                ),
-                const SizedBox(width: 12),
-                Icon(
-                  Icons.calendar_today,
-                  size: 14,
-                  color: Colors.grey.shade600,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${availableDays.length} days',
+                  location['contact_number'],
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
               ],
             ),
-
-            // Contact number if available - ADD THIS SECTION
-            if (location['contact_number'] != null &&
-                location['contact_number'].toString().isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(Icons.phone, size: 12, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(
-                    location['contact_number'],
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ],
           ],
-        ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showAllLocationsModal(BuildContext context) {
     showModalBottomSheet(
