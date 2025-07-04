@@ -24,11 +24,24 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   Map<String, dynamic>? _appointmentDetails;
   List<Map<String, dynamic>> _appointmentLocations = [];
   bool _loadingAppointmentDetails = false;
-
+  // Add these after line 25 with other state variables
+  final _designationController = TextEditingController();
+  final _specialitiesController = TextEditingController();
+  final _experienceController = TextEditingController();
+  bool _savingProfessionalDetails = false;
   @override
   void initState() {
     super.initState();
     _initializeDashboard();
+  }
+
+  @override
+  void dispose() {
+    // Add these lines to existing dispose method
+    _designationController.dispose();
+    _specialitiesController.dispose();
+    _experienceController.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeDashboard() async {
@@ -114,9 +127,9 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -136,13 +149,402 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     }
   }
 
+  void _showProfessionalDetailsModal() {
+    // Populate controllers with existing data
+    if (_appointmentDetails != null) {
+      _designationController.text = _appointmentDetails!['designation'] ?? '';
+      _specialitiesController.text = _appointmentDetails!['specialities'] ?? '';
+      _experienceController.text =
+          _appointmentDetails!['experience']?.toString() ?? '';
+    } else {
+      _designationController.clear();
+      _specialitiesController.clear();
+      _experienceController.clear();
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setModalState) => DraggableScrollableSheet(
+                  initialChildSize: 0.8,
+                  minChildSize: 0.5,
+                  maxChildSize: 0.95,
+                  expand: false,
+                  builder: (context, scrollController) {
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Handle bar
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Header
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Professional Details',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Update your professional information',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                          const Divider(),
+                          const SizedBox(height: 16),
+
+                          // Form content
+                          Expanded(
+                            child: SingleChildScrollView(
+                              controller: scrollController,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Designation field
+                                  const Text(
+                                    'Designation',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.teal,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    controller: _designationController,
+                                    decoration: InputDecoration(
+                                      hintText: 'e.g., Consultant Cardiologist',
+                                      prefixIcon: const Icon(
+                                        Icons.business_center,
+                                        color: Colors.teal,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: Colors.teal,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Specialities field
+                                  const Text(
+                                    'Specialities',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.teal,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    controller: _specialitiesController,
+                                    maxLines: 3,
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          'e.g., Cardiology, Heart Surgery, Interventional Cardiology',
+                                      prefixIcon: const Icon(
+                                        Icons.local_hospital,
+                                        color: Colors.teal,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: Colors.teal,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Experience field
+                                  const Text(
+                                    'Experience (Years)',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.teal,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    controller: _experienceController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      hintText: 'e.g., 10',
+                                      prefixIcon: const Icon(
+                                        Icons.timeline,
+                                        color: Colors.teal,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: Colors.teal,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 30),
+
+                                  // Action buttons
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed:
+                                              _savingProfessionalDetails
+                                                  ? null
+                                                  : () =>
+                                                      Navigator.pop(context),
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 14,
+                                            ),
+                                            side: const BorderSide(
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                          child: const Text('Cancel'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        flex: 2,
+                                        child: ElevatedButton(
+                                          onPressed:
+                                              _savingProfessionalDetails
+                                                  ? null
+                                                  : () =>
+                                                      _saveProfessionalDetails(
+                                                        setModalState,
+                                                      ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.teal,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 14,
+                                            ),
+                                          ),
+                                          child:
+                                              _savingProfessionalDetails
+                                                  ? const SizedBox(
+                                                    height: 20,
+                                                    width: 20,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                            Color
+                                                          >(Colors.white),
+                                                    ),
+                                                  )
+                                                  : const Text('Save Changes'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Note about appointment locations
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.blue.shade200,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.info,
+                                          color: Colors.blue.shade700,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Need to manage appointment locations?',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.blue.shade700,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              GestureDetector(
+                                                onTap: () {
+                                                  Navigator.pop(context);
+                                                  _navigateToAppointmentDetails();
+                                                },
+                                                child: Text(
+                                                  'Go to Appointment Setup →',
+                                                  style: TextStyle(
+                                                    color: Colors.blue.shade600,
+                                                    fontSize: 13,
+                                                    decoration:
+                                                        TextDecoration
+                                                            .underline,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+          ),
+    );
+  }
+
+  Future<void> _saveProfessionalDetails(StateSetter setModalState) async {
+    // Validate fields
+    if (_designationController.text.trim().isEmpty) {
+      _showError('Please enter your designation');
+      return;
+    }
+    if (_specialitiesController.text.trim().isEmpty) {
+      _showError('Please enter your specialities');
+      return;
+    }
+    if (_experienceController.text.trim().isEmpty) {
+      _showError('Please enter your experience in years');
+      return;
+    }
+
+    final experience = int.tryParse(_experienceController.text.trim());
+    if (experience == null || experience < 0) {
+      _showError('Please enter a valid experience in years');
+      return;
+    }
+
+    setModalState(() => _savingProfessionalDetails = true);
+
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      final professionalData = {
+        'designation': _designationController.text.trim(),
+        'specialities': _specialitiesController.text.trim(),
+        'experience': experience,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      if (_appointmentDetails == null) {
+        // Create new appointment details record
+        final response =
+            await supabase
+                .from('doctor_appointments')
+                .insert({'doctor_id': userId, ...professionalData})
+                .select()
+                .single();
+
+        if (mounted) {
+          setState(() => _appointmentDetails = response);
+        }
+      } else {
+        // Update existing appointment details
+        final response =
+            await supabase
+                .from('doctor_appointments')
+                .update(professionalData)
+                .eq('doctor_id', userId)
+                .select()
+                .single();
+
+        if (mounted) {
+          setState(() => _appointmentDetails = response);
+        }
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Professional details updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Error saving professional details: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setModalState(() => _savingProfessionalDetails = false);
+      }
+    }
+  }
+
   void _navigateToResubmit() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DoctorResubmitScreen(
-          doctorData: _doctorProfile!,
-        ),
+        builder: (context) => DoctorResubmitScreen(doctorData: _doctorProfile!),
       ),
     ).then((_) => _fetchDoctorProfile());
   }
@@ -151,9 +553,10 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DoctorAppointmentDetailsScreen(
-          doctorId: supabase.auth.currentUser!.id,
-        ),
+        builder:
+            (context) => DoctorAppointmentDetailsScreen(
+              doctorId: supabase.auth.currentUser!.id,
+            ),
       ),
     ).then((_) => _fetchAppointmentDetails());
   }
@@ -162,12 +565,12 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   String _getDayName(int weekday) {
     const days = [
       'Monday',
-      'Tuesday', 
+      'Tuesday',
       'Wednesday',
       'Thursday',
       'Friday',
       'Saturday',
-      'Sunday'
+      'Sunday',
     ];
     return days[weekday - 1];
   }
@@ -176,10 +579,20 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   String _formatTodayDate() {
     final today = DateTime.now();
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
-    
+
     return '${_getDayName(today.weekday)}, ${today.day} ${months[today.month - 1]} ${today.year}';
   }
 
@@ -188,10 +601,12 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     final dayName = _getDayName(today.weekday);
 
     // Filter locations that are available today
-    final todaysLocations = _appointmentLocations.where((location) {
-      final availableDays = (location['available_days'] as List<dynamic>?) ?? [];
-      return availableDays.contains(dayName);
-    }).toList();
+    final todaysLocations =
+        _appointmentLocations.where((location) {
+          final availableDays =
+              (location['available_days'] as List<dynamic>?) ?? [];
+          return availableDays.contains(dayName);
+        }).toList();
 
     return Card(
       elevation: 4,
@@ -244,84 +659,87 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
             todaysLocations.isEmpty
                 ? Container(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.event_available,
-                          size: 48,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No appointments scheduled for today',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 16,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _formatTodayDate(),
-                          style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Column(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
                     children: [
-                      // Today's date header
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 12,
+                      Icon(
+                        Icons.event_available,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No appointments scheduled for today',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 16,
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _formatTodayDate(),
-                          style: TextStyle(
-                            color: Colors.blue.shade800,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                          textAlign: TextAlign.center,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTodayDate(),
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 14,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                    ],
+                  ),
+                )
+                : Column(
+                  children: [
+                    // Today's date header
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _formatTodayDate(),
+                        style: TextStyle(
+                          color: Colors.blue.shade800,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
-                      // Show only first 3 today's locations
-                      ...todaysLocations.take(3).map((location) {
-                        return _buildCompactTodaysLocationTile(location);
-                      }),
+                    // Show only first 3 today's locations
+                    ...todaysLocations.take(3).map((location) {
+                      return _buildCompactTodaysLocationTile(location);
+                    }),
 
-                      // Show "View All" if there are more than 3 today's locations
-                      if (todaysLocations.length > 3)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Center(
-                            child: TextButton.icon(
-                              onPressed: () => _showAllTodaysLocationsModal(todaysLocations),
-                              icon: const Icon(Icons.visibility),
-                              label: Text(
-                                'View All ${todaysLocations.length} Today\'s Locations',
-                                style: TextStyle(
-                                  color: Colors.blue.shade700,
-                                  fontWeight: FontWeight.bold,
+                    // Show "View All" if there are more than 3 today's locations
+                    if (todaysLocations.length > 3)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Center(
+                          child: TextButton.icon(
+                            onPressed:
+                                () => _showAllTodaysLocationsModal(
+                                  todaysLocations,
                                 ),
+                            icon: const Icon(Icons.visibility),
+                            label: Text(
+                              'View All ${todaysLocations.length} Today\'s Locations',
+                              style: TextStyle(
+                                color: Colors.blue.shade700,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
+                ),
           ],
         ),
       ),
@@ -365,9 +783,10 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               ),
             ],
           ),
-          
+
           // Address - ADD THIS SECTION
-          if (location['address'] != null && location['address'].toString().isNotEmpty) ...[
+          if (location['address'] != null &&
+              location['address'].toString().isNotEmpty) ...[
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,10 +796,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                 Expanded(
                   child: Text(
                     location['address'],
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade700,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -388,9 +804,9 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               ],
             ),
           ],
-          
+
           const SizedBox(height: 6),
-          
+
           // Compact info in one row
           Row(
             children: [
@@ -409,7 +825,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               ),
             ],
           ),
-          
+
           // Contact number if available - ADD THIS SECTION
           if (location['contact_number'] != null &&
               location['contact_number'].toString().isNotEmpty) ...[
@@ -420,10 +836,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                 const SizedBox(width: 4),
                 Text(
                   location['contact_number'],
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade700,
-                  ),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                 ),
               ],
             ),
@@ -474,10 +887,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                 Expanded(
                   child: Text(
                     location['address'],
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade700,
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                   ),
                 ),
               ],
@@ -488,11 +898,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           // Time and duration info
           Row(
             children: [
-              Icon(
-                Icons.access_time,
-                size: 16,
-                color: Colors.blue.shade600,
-              ),
+              Icon(Icons.access_time, size: 16, color: Colors.blue.shade600),
               const SizedBox(width: 4),
               Text(
                 '${location['start_time']} - ${location['end_time']}',
@@ -503,18 +909,11 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-              Icon(
-                Icons.timer,
-                size: 16,
-                color: Colors.blue.shade600,
-              ),
+              Icon(Icons.timer, size: 16, color: Colors.blue.shade600),
               const SizedBox(width: 4),
               Text(
                 '${location['appointment_duration']}min slots',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade700,
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
               ),
             ],
           ),
@@ -524,18 +923,11 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           // Max appointments info
           Row(
             children: [
-              Icon(
-                Icons.event,
-                size: 16,
-                color: Colors.blue.shade600,
-              ),
+              Icon(Icons.event, size: 16, color: Colors.blue.shade600),
               const SizedBox(width: 4),
               Text(
                 'Up to ${location['max_appointments_per_day']} appointments today',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade700,
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
               ),
             ],
           ),
@@ -546,18 +938,11 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
             const SizedBox(height: 6),
             Row(
               children: [
-                Icon(
-                  Icons.phone,
-                  size: 16,
-                  color: Colors.blue.shade600,
-                ),
+                Icon(Icons.phone, size: 16, color: Colors.blue.shade600),
                 const SizedBox(width: 4),
                 Text(
                   location['contact_number'],
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade700,
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                 ),
               ],
             ),
@@ -567,77 +952,83 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     );
   }
 
-  void _showAllTodaysLocationsModal(List<Map<String, dynamic>> todaysLocations) {
+  void _showAllTodaysLocationsModal(
+    List<Map<String, dynamic>> todaysLocations,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            expand: false,
+            builder: (context, scrollController) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Today\'s Schedule',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                      ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
+                    const SizedBox(height: 16),
+
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Today\'s Schedule',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      '${_formatTodayDate()} • ${todaysLocations.length} locations',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+
+                    // All today's locations
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: todaysLocations.length,
+                        itemBuilder: (context, index) {
+                          final location = todaysLocations[index];
+                          return _buildTodaysLocationTile(location);
+                        },
+                      ),
                     ),
                   ],
                 ),
-                Text(
-                  '${_formatTodayDate()} • ${todaysLocations.length} locations',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14,
-                  ),
-                ),
-                const Divider(),
-                const SizedBox(height: 8),
-                
-                // All today's locations
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    itemCount: todaysLocations.length,
-                    itemBuilder: (context, index) {
-                      final location = todaysLocations[index];
-                      return _buildTodaysLocationTile(location);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
     );
   }
 
@@ -804,9 +1195,10 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     ),
                 ],
               ),
-              
+
               // Professional Details Section
-              if (_doctorProfile!['verified'] == true && _appointmentDetails != null) ...[
+              if (_doctorProfile!['verified'] == true &&
+                  _appointmentDetails != null) ...[
                 const SizedBox(height: 16),
                 Container(
                   width: double.infinity,
@@ -830,18 +1222,26 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                             ),
                           ),
                           IconButton(
-                            icon: Icon(Icons.edit, color: Colors.teal.shade700, size: 20),
-                            onPressed: _navigateToAppointmentDetails,
+                            icon: Icon(
+                              Icons.edit,
+                              color: Colors.teal.shade700,
+                              size: 20,
+                            ),
+                            onPressed: _showProfessionalDetailsModal, // Changed from _navigateToAppointmentDetails
                             tooltip: 'Edit Professional Details',
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Designation
                       Row(
                         children: [
-                          Icon(Icons.business_center, size: 18, color: Colors.teal.shade600),
+                          Icon(
+                            Icons.business_center,
+                            size: 18,
+                            color: Colors.teal.shade600,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Designation: ',
@@ -862,12 +1262,16 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Specialities
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.local_hospital, size: 18, color: Colors.teal.shade600),
+                          Icon(
+                            Icons.local_hospital,
+                            size: 18,
+                            color: Colors.teal.shade600,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Specialities: ',
@@ -888,11 +1292,15 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Experience
                       Row(
                         children: [
-                          Icon(Icons.timeline, size: 18, color: Colors.teal.shade600),
+                          Icon(
+                            Icons.timeline,
+                            size: 18,
+                            color: Colors.teal.shade600,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Experience: ',
@@ -915,7 +1323,8 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     ],
                   ),
                 ),
-              ] else if (_doctorProfile!['verified'] == true && _appointmentDetails == null) ...[
+              ] else if (_doctorProfile!['verified'] == true &&
+                  _appointmentDetails == null) ...[
                 // Show this when verified but no appointment details set up yet
                 const SizedBox(height: 16),
                 Container(
@@ -940,7 +1349,11 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                             ),
                           ),
                           IconButton(
-                            icon: Icon(Icons.add, color: Colors.orange.shade700, size: 20),
+                            icon: Icon(
+                              Icons.add,
+                              color: Colors.orange.shade700,
+                              size: 20,
+                            ),
                             onPressed: _navigateToAppointmentDetails,
                             tooltip: 'Add Professional Details',
                           ),
@@ -1054,9 +1467,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: const Padding(
           padding: EdgeInsets.all(40),
-          child: Center(
-            child: CircularProgressIndicator(),
-          ),
+          child: Center(child: CircularProgressIndicator()),
         ),
       );
     }
@@ -1099,12 +1510,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         children: [
           Icon(icon, size: 20, color: Colors.teal),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );
@@ -1151,11 +1557,12 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : SingleChildScrollView(
-                          child: _buildDoctorProfileInfo(),
-                        ),
+                  child:
+                      _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : SingleChildScrollView(
+                            child: _buildDoctorProfileInfo(),
+                          ),
                 ),
               ),
             ),
@@ -1359,7 +1766,9 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                 color: Colors.teal.shade700,
               ),
             ),
-            subtitle: Text('${widget.appointmentLocations.length} locations configured'),
+            subtitle: Text(
+              '${widget.appointmentLocations.length} locations configured',
+            ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1422,7 +1831,10 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.teal.shade50,
                           borderRadius: BorderRadius.circular(12),
@@ -1482,7 +1894,7 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
 
   Widget _buildLocationTile(Map<String, dynamic> location) {
     final availableDays = (location['available_days'] as List<dynamic>?) ?? [];
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
@@ -1518,9 +1930,10 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                 ),
               ],
             ),
-            
+
             // Address - ADD THIS SECTION
-            if (location['address'] != null && location['address'].toString().isNotEmpty) ...[
+            if (location['address'] != null &&
+                location['address'].toString().isNotEmpty) ...[
               const SizedBox(height: 4),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1541,9 +1954,9 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                 ],
               ),
             ],
-            
+
             const SizedBox(height: 4),
-            
+
             // Compact info row
             Row(
               children: [
@@ -1561,7 +1974,11 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
                 const SizedBox(width: 12),
-                Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                Icon(
+                  Icons.calendar_today,
+                  size: 14,
+                  color: Colors.grey.shade600,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   '${availableDays.length} days',
@@ -1569,7 +1986,7 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                 ),
               ],
             ),
-            
+
             // Contact number if available - ADD THIS SECTION
             if (location['contact_number'] != null &&
                 location['contact_number'].toString().isNotEmpty) ...[
@@ -1580,10 +1997,7 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                   const SizedBox(width: 4),
                   Text(
                     location['contact_number'],
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -1601,79 +2015,80 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            expand: false,
+            builder: (context, scrollController) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'All Appointment Locations',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(5),
+                        ),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
+                    const SizedBox(height: 16),
+
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'All Appointment Locations',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      '${widget.appointmentLocations.length} locations configured',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+
+                    // All locations list
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: widget.appointmentLocations.length,
+                        itemBuilder: (context, index) {
+                          final location = widget.appointmentLocations[index];
+                          return _buildDetailedLocationTile(location);
+                        },
+                      ),
                     ),
                   ],
                 ),
-                Text(
-                  '${widget.appointmentLocations.length} locations configured',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14,
-                  ),
-                ),
-                const Divider(),
-                const SizedBox(height: 8),
-                
-                // All locations list
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    itemCount: widget.appointmentLocations.length,
-                    itemBuilder: (context, index) {
-                      final location = widget.appointmentLocations[index];
-                      return _buildDetailedLocationTile(location);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
     );
   }
 
   Widget _buildDetailedLocationTile(Map<String, dynamic> location) {
     final availableDays = (location['available_days'] as List<dynamic>?) ?? [];
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -1706,10 +2121,7 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                 Expanded(
                   child: Text(
                     location['address'],
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade700,
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                   ),
                 ),
               ],
@@ -1735,15 +2147,12 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
               const SizedBox(width: 4),
               Text(
                 '${location['appointment_duration']}min slots',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade700,
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
               ),
             ],
           ),
 
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
 
           // Max appointments info
           Row(
@@ -1752,10 +2161,7 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
               const SizedBox(width: 4),
               Text(
                 'Max ${location['max_appointments_per_day']} appointments/day',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade700,
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
               ),
             ],
           ),
@@ -1776,27 +2182,32 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
             Wrap(
               spacing: 4,
               runSpacing: 2,
-              children: availableDays
-                  .map(
-                    (day) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.teal.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.teal.shade300),
-                      ),
-                      child: Text(
-                        day.toString(),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.teal.shade700,
-                          fontWeight: FontWeight.w500,
+              children:
+                  availableDays
+                      .map(
+                        (day) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.teal.shade300),
+                          ),
+                          child: Text(
+                            day.toString(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.teal.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  )
-                  .toList(),
-      )] else
+                      )
+                      .toList(),
+            ),
+          ] else
             Text(
               'No days selected',
               style: TextStyle(
