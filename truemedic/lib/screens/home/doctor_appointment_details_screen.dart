@@ -16,6 +16,9 @@ class _DoctorAppointmentDetailsScreenState
     extends State<DoctorAppointmentDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
   final supabase = Supabase.instance.client;
+  
+  // ADD THIS LINE:
+  final ScrollController _scrollController = ScrollController();
 
   // Loading state
   bool _isLoading = true;
@@ -39,6 +42,7 @@ class _DoctorAppointmentDetailsScreenState
 
   @override
   void dispose() {
+    _scrollController.dispose(); // Add this line
     super.dispose();
   }
 
@@ -136,7 +140,7 @@ class _DoctorAppointmentDetailsScreenState
     }
   }
 
-  void _addNewLocation() {
+  void _addNewLocation() async {
     setState(() {
       _appointmentLocations.add({
         'location_name': '',
@@ -152,6 +156,22 @@ class _DoctorAppointmentDetailsScreenState
       // Initialize empty days set for new location
       _locationDays[_appointmentLocations.length - 1] = <String>{};
     });
+
+    // Wait for the widget to rebuild, then scroll to the new location
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    if (mounted) {
+      // Calculate the approximate position of the new location card
+      // Each card is approximately 600 pixels tall (including margins)
+      final double targetPosition = (_appointmentLocations.length - 1) * 600.0;
+      
+      // Scroll to the new location with animation
+      _scrollController.animateTo(
+        targetPosition,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   void _removeLocation(int index) {
@@ -290,6 +310,7 @@ class _DoctorAppointmentDetailsScreenState
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
+                  controller: _scrollController, // Add this line
                   padding: const EdgeInsets.all(16),
                   child: Form(
                     key: _formKey,
