@@ -48,21 +48,22 @@ class _UserReviewsScreenState extends State<UserReviewsScreen> {
   Future<void> _deleteReview(Review review) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Review'),
-        content: const Text('Are you sure you want to delete this review?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Review'),
+            content: const Text('Are you sure you want to delete this review?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
@@ -95,36 +96,48 @@ class _UserReviewsScreenState extends State<UserReviewsScreen> {
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadUserReviews,
-              child: _reviews.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.rate_review, size: 64, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
-                            'No reviews yet',
-                            style: TextStyle(fontSize: 18, color: Colors.grey),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                onRefresh: _loadUserReviews,
+                child:
+                    _reviews.isEmpty
+                        ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.rate_review,
+                                size: 64,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'No reviews yet',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Start reviewing doctors to help others',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Start reviewing doctors to help others',
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _reviews.length,
-                      itemBuilder: (context, index) {
-                        return _buildReviewCard(_reviews[index]);
-                      },
-                    ),
-            ),
+                        )
+                        : ListView.builder(
+                          itemCount: _reviews.length,
+                          itemBuilder: (context, index) {
+                            return _buildReviewCard(_reviews[index]);
+                          },
+                        ),
+              ),
     );
   }
 
@@ -141,7 +154,8 @@ class _UserReviewsScreenState extends State<UserReviewsScreen> {
                 CircleAvatar(
                   backgroundColor: Colors.teal,
                   child: Text(
-                    review.patientName?.substring(0, 1).toUpperCase() ?? 'D',
+                    // ✅ FIX: Use doctorName instead of patientName
+                    (review.doctorName ?? 'D').substring(0, 1).toUpperCase(),
                     style: const TextStyle(color: Colors.white),
                   ),
                 ),
@@ -151,7 +165,8 @@ class _UserReviewsScreenState extends State<UserReviewsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        review.patientName ?? 'Unknown Doctor',
+                        // ✅ FIX: Display doctor name instead of patient name
+                        review.doctorName ?? 'Unknown Doctor',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -181,44 +196,45 @@ class _UserReviewsScreenState extends State<UserReviewsScreen> {
                       _deleteReview(review);
                     }
                   },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, color: Colors.blue),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete'),
-                        ],
-                      ),
-                    ),
-                  ],
+                  itemBuilder:
+                      (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, color: Colors.blue),
+                              SizedBox(width: 8),
+                              Text('Edit'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Delete'),
+                            ],
+                          ),
+                        ),
+                      ],
                 ),
               ],
             ),
             if (review.reviewText != null && review.reviewText!.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(
-                review.reviewText!,
-                style: const TextStyle(fontSize: 14),
-              ),
+              Text(review.reviewText!, style: const TextStyle(fontSize: 14)),
             ],
             const SizedBox(height: 8),
             Row(
               children: [
                 if (review.isAnonymous)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade200,
                       borderRadius: BorderRadius.circular(12),
@@ -232,7 +248,11 @@ class _UserReviewsScreenState extends State<UserReviewsScreen> {
                 if (review.helpfulVotes > 0)
                   Row(
                     children: [
-                      Icon(Icons.thumb_up, size: 16, color: Colors.grey.shade600),
+                      Icon(
+                        Icons.thumb_up,
+                        size: 16,
+                        color: Colors.grey.shade600,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${review.helpfulVotes} helpful',
@@ -267,7 +287,7 @@ class _UserReviewsScreenState extends State<UserReviewsScreen> {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       return 'Today';
     } else if (difference.inDays == 1) {
@@ -283,11 +303,13 @@ class _UserReviewsScreenState extends State<UserReviewsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => WriteReviewScreen(
-          doctorId: review.doctorId,
-          doctorName: review.patientName ?? 'Unknown Doctor',
-          existingReview: review,
-        ),
+        builder:
+            (context) => WriteReviewScreen(
+              doctorId: review.doctorId,
+              // ✅ FIX: Use doctorName instead of patientName
+              doctorName: review.doctorName ?? 'Unknown Doctor',
+              existingReview: review,
+            ),
       ),
     ).then((result) {
       if (result == true) {
