@@ -55,18 +55,20 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
         userId,
       );
 
-      setState(() {
-        _hasExistingReview = hasReviewed;
-      });
-
-      if (hasReviewed) {
-        // Show dialog and navigate back
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showExistingReviewDialog();
+      if (mounted) {
+        setState(() {
+          _hasExistingReview = hasReviewed;
         });
+
+        if (hasReviewed) {
+          // Show dialog and navigate back
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showExistingReviewDialog();
+          });
+        }
       }
     } catch (e) {
-      print('Error checking existing review: $e');
+      print('Error checking existing review: $e'); // Keep this print for debugging
     }
   }
 
@@ -74,31 +76,32 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Review Already Exists'),
-        content: const Text(
-          'You have already reviewed this doctor. You can only submit one review per doctor.\n\n'
-          'To update your review, go to "My Reviews" and edit your existing review.',
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to previous screen
-            },
-            child: const Text('OK'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Review Already Exists'),
+            content: const Text(
+              'You have already reviewed this doctor. You can only submit one review per doctor.\n\n'
+              'To update your review, go to "My Reviews" and edit your existing review.',
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Go back to previous screen
+                },
+                child: const Text('OK'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Go back
+                  // Navigate to user reviews
+                  Navigator.pushNamed(context, '/user-reviews');
+                },
+                child: const Text('View My Reviews'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back
-              // Navigate to user reviews
-              Navigator.pushNamed(context, '/user-reviews');
-            },
-            child: const Text('View My Reviews'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -165,11 +168,12 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     } catch (e) {
       if (mounted) {
         String errorMessage = e.toString();
-        
+
         // Handle specific duplicate review error
         if (errorMessage.contains('already reviewed')) {
-          errorMessage = 'You have already reviewed this doctor. Please edit your existing review instead.';
-          
+          errorMessage =
+              'You have already reviewed this doctor. Please edit your existing review instead.';
+
           // Update local state
           setState(() {
             _hasExistingReview = true;
@@ -177,10 +181,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
         );
       }
     } finally {

@@ -9,6 +9,7 @@ class Review {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? patientName;
+  final String? doctorName; // ✅ Add this
   final String? doctorResponse;
   final int helpfulVotes;
   final int totalVotes;
@@ -24,6 +25,7 @@ class Review {
     required this.createdAt,
     required this.updatedAt,
     this.patientName,
+    this.doctorName, // ✅ Add this
     this.doctorResponse,
     this.helpfulVotes = 0,
     this.totalVotes = 0,
@@ -41,6 +43,7 @@ class Review {
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       patientName: json['patient_name'],
+      doctorName: json['doctor_name'], // ✅ Add this
       doctorResponse: json['doctor_response'],
       helpfulVotes: json['helpful_votes'] ?? 0,
       totalVotes: json['total_votes'] ?? 0,

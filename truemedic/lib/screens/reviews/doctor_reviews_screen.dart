@@ -253,10 +253,10 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
                 CircleAvatar(
                   backgroundColor: Colors.teal,
                   child: Text(
-                    review.isAnonymous
-                        ? 'A'
-                        : (review.patientName?.substring(0, 1).toUpperCase() ??
-                            'U'),
+                    // Use doctorName for the avatar initial
+                    (review.doctorName ?? review.patientName ?? 'D')
+                        .substring(0, 1)
+                        .toUpperCase(),
                     style: const TextStyle(color: Colors.white),
                   ),
                 ),
@@ -265,19 +265,13 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            review.isAnonymous
-                                ? 'Anonymous'
-                                : (review.patientName ?? 'Unknown'),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          if (review.isVerified) ...[
-                            const SizedBox(width: 8),
-                            Icon(Icons.verified, color: Colors.green, size: 16),
-                          ],
-                        ],
+                      Text(
+                        // ✅ FIX: Use doctorName instead of patientName
+                        review.doctorName ?? review.patientName ?? 'Unknown Doctor',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       Row(
                         children: [
@@ -295,25 +289,78 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
                     ],
                   ),
                 ),
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _editReview(review);
+                    } else if (value == 'delete') {
+                      _deleteReview(review);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
             if (review.reviewText != null && review.reviewText!.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(review.reviewText!, style: const TextStyle(fontSize: 14)),
-            ],
-            if (review.helpfulVotes > 0) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.thumb_up, size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${review.helpfulVotes} found this helpful',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                  ),
-                ],
+              Text(
+                review.reviewText!,
+                style: const TextStyle(fontSize: 14),
               ),
             ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (review.isAnonymous)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Anonymous',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
+                const Spacer(),
+                if (review.helpfulVotes > 0)
+                  Row(
+                    children: [
+                      Icon(Icons.thumb_up, size: 16, color: Colors.grey.shade600),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${review.helpfulVotes} helpful',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -431,5 +478,85 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
             ],
           ),
     );
+  }
+
+  void _editReview(Review review) {
+    // Only allow users to edit their own reviews
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId != review.patientId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You can only edit your own reviews')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WriteReviewScreen(
+          doctorId: review.doctorId,
+          doctorName: widget.doctorName,
+          existingReview: review,
+        ),
+      ),
+    ).then((result) {
+      if (result == true) {
+        _loadReviews(); // Refresh reviews after editing
+      }
+    });
+  }
+
+  Future<void> _deleteReview(Review review) async {
+    // Only allow users to delete their own reviews
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId != review.patientId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You can only delete your own reviews')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Review'),
+        content: const Text('Are you sure you want to delete this review?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _reviewService.deleteReview(review.id, currentUserId!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Review deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _loadReviews(); // Refresh the list
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting review: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 }
