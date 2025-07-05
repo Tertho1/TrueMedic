@@ -974,20 +974,70 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
       return;
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => WriteReviewScreen(
+    // 🛡️ Check if user already reviewed this doctor
+    _checkAndNavigateToReview();
+  }
+
+  // Add this method
+  Future<void> _checkAndNavigateToReview() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final hasReviewed = await _reviewService.hasUserReviewed(
+        _registeredDoctorId!,
+        userId,
+      );
+
+      if (hasReviewed) {
+        // Show option to edit existing review
+        _showExistingReviewDialog();
+      } else {
+        // Navigate to write new review
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WriteReviewScreen(
               doctorId: _registeredDoctorId!,
               doctorName: _doctor.fullName,
             ),
-      ),
-    ).then((result) {
-      if (result == true) {
-        _loadDoctorReviewStats(_doctor.bmdcNumber); // Refresh reviews
+          ),
+        ).then((result) {
+          if (result == true) {
+            _loadDoctorReviewStats(_doctor.bmdcNumber);
+          }
+        });
       }
-    });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+
+  void _showExistingReviewDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Review Already Exists'),
+        content: const Text(
+          'You have already reviewed this doctor. Would you like to edit your existing review?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/user-reviews');
+            },
+            child: const Text('Edit My Review'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _navigateToReport() {

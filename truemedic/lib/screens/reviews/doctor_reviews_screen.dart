@@ -3,6 +3,7 @@ import '../../services/review_service.dart';
 import '../../models/review.dart';
 import '../../models/review_stats.dart';
 import 'write_review_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DoctorReviewsScreen extends StatefulWidget {
   final String doctorId;
@@ -41,7 +42,7 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
         orderBy: _sortBy,
         ascending: _ascending,
       );
-      
+
       final stats = await _reviewService.getDoctorReviewStats(widget.doctorId);
 
       setState(() {
@@ -89,44 +90,62 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
               });
               _loadReviews();
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'newest', child: Text('Newest First')),
-              const PopupMenuItem(value: 'oldest', child: Text('Oldest First')),
-              const PopupMenuItem(value: 'highest', child: Text('Highest Rating')),
-              const PopupMenuItem(value: 'lowest', child: Text('Lowest Rating')),
-            ],
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'newest',
+                    child: Text('Newest First'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'oldest',
+                    child: Text('Oldest First'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'highest',
+                    child: Text('Highest Rating'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'lowest',
+                    child: Text('Lowest Rating'),
+                  ),
+                ],
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadReviews,
-              child: Column(
-                children: [
-                  // Review statistics
-                  if (_reviewStats != null) _buildReviewStats(),
-                  
-                  // Reviews list
-                  Expanded(
-                    child: _reviews.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No reviews yet\nBe the first to review this doctor!',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 16, color: Colors.grey),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _reviews.length,
-                            itemBuilder: (context, index) {
-                              return _buildReviewCard(_reviews[index]);
-                            },
-                          ),
-                  ),
-                ],
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                onRefresh: _loadReviews,
+                child: Column(
+                  children: [
+                    // Review statistics
+                    if (_reviewStats != null) _buildReviewStats(),
+
+                    // Reviews list
+                    Expanded(
+                      child:
+                          _reviews.isEmpty
+                              ? const Center(
+                                child: Text(
+                                  'No reviews yet\nBe the first to review this doctor!',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              )
+                              : ListView.builder(
+                                itemCount: _reviews.length,
+                                itemBuilder: (context, index) {
+                                  return _buildReviewCard(_reviews[index]);
+                                },
+                              ),
+                    ),
+                  ],
+                ),
               ),
-            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToWriteReview,
         backgroundColor: Colors.teal,
@@ -167,7 +186,10 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
                   child: Column(
                     children: [
                       for (int i = 5; i >= 1; i--)
-                        _buildRatingBar(i, _reviewStats!.ratingBreakdown[i] ?? 0),
+                        _buildRatingBar(
+                          i,
+                          _reviewStats!.ratingBreakdown[i] ?? 0,
+                        ),
                     ],
                   ),
                 ),
@@ -193,10 +215,11 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
   }
 
   Widget _buildRatingBar(int stars, int count) {
-    final percentage = _reviewStats!.totalReviews > 0 
-        ? count / _reviewStats!.totalReviews 
-        : 0.0;
-    
+    final percentage =
+        _reviewStats!.totalReviews > 0
+            ? count / _reviewStats!.totalReviews
+            : 0.0;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -230,9 +253,10 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
                 CircleAvatar(
                   backgroundColor: Colors.teal,
                   child: Text(
-                    review.isAnonymous 
-                        ? 'A' 
-                        : (review.patientName?.substring(0, 1).toUpperCase() ?? 'U'),
+                    review.isAnonymous
+                        ? 'A'
+                        : (review.patientName?.substring(0, 1).toUpperCase() ??
+                            'U'),
                     style: const TextStyle(color: Colors.white),
                   ),
                 ),
@@ -244,16 +268,14 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
                       Row(
                         children: [
                           Text(
-                            review.isAnonymous ? 'Anonymous' : (review.patientName ?? 'Unknown'),
+                            review.isAnonymous
+                                ? 'Anonymous'
+                                : (review.patientName ?? 'Unknown'),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           if (review.isVerified) ...[
                             const SizedBox(width: 8),
-                            Icon(
-                              Icons.verified,
-                              color: Colors.green,
-                              size: 16,
-                            ),
+                            Icon(Icons.verified, color: Colors.green, size: 16),
                           ],
                         ],
                       ),
@@ -277,10 +299,7 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
             ),
             if (review.reviewText != null && review.reviewText!.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(
-                review.reviewText!,
-                style: const TextStyle(fontSize: 14),
-              ),
+              Text(review.reviewText!, style: const TextStyle(fontSize: 14)),
             ],
             if (review.helpfulVotes > 0) ...[
               const SizedBox(height: 8),
@@ -290,10 +309,7 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
                   const SizedBox(width: 4),
                   Text(
                     '${review.helpfulVotes} found this helpful',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                   ),
                 ],
               ),
@@ -307,7 +323,7 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       return 'Today';
     } else if (difference.inDays == 1) {
@@ -320,18 +336,100 @@ class _DoctorReviewsScreenState extends State<DoctorReviewsScreen> {
   }
 
   void _navigateToWriteReview() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => WriteReviewScreen(
-          doctorId: widget.doctorId,
-          doctorName: widget.doctorName,
-        ),
-      ),
-    ).then((result) {
-      if (result == true) {
-        _loadReviews(); // Refresh reviews after writing
+    // Check if user is logged in
+    final supabase = Supabase.instance.client;
+    if (supabase.auth.currentUser == null) {
+      _showLoginPrompt();
+      return;
+    }
+
+    // 🛡️ Check if user already reviewed this doctor
+    _checkAndNavigateToReview();
+  }
+
+  // Add this method
+  Future<void> _checkAndNavigateToReview() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final hasReviewed = await _reviewService.hasUserReviewed(
+        widget.doctorId,
+        userId,
+      );
+
+      if (hasReviewed) {
+        _showExistingReviewDialog();
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => WriteReviewScreen(
+                  doctorId: widget.doctorId,
+                  doctorName: widget.doctorName,
+                ),
+          ),
+        ).then((result) {
+          if (result == true) {
+            _loadReviews();
+          }
+        });
       }
-    });
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+    }
+  }
+
+  void _showExistingReviewDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Review Already Exists'),
+            content: const Text(
+              'You have already reviewed this doctor. Would you like to edit your existing review?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/user-reviews');
+                },
+                child: const Text('Edit My Review'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showLoginPrompt() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Login Required'),
+            content: const Text('You need to be logged in to write a review.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/user-login');
+                },
+                child: const Text('Login'),
+              ),
+            ],
+          ),
+    );
   }
 }

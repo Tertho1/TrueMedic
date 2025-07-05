@@ -50,6 +50,18 @@ class ReviewService {
     String? reviewText,
     bool isAnonymous = false,
   }) async {
+    // 🛡️ ANTI-SPAM: Check if user has already reviewed this doctor
+    final existingReview = await _supabase
+        .from('reviews')
+        .select('id')
+        .eq('doctor_id', doctorId)
+        .eq('patient_id', patientId)
+        .maybeSingle();
+
+    if (existingReview != null) {
+      throw Exception('You have already reviewed this doctor. You can edit your existing review instead.');
+    }
+
     final reviewData = {
       'doctor_id': doctorId,
       'patient_id': patientId,

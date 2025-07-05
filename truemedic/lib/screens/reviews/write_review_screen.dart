@@ -29,6 +29,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   int _rating = 0;
   bool _isAnonymous = false;
   bool _isLoading = false;
+  bool _hasExistingReview = false; // Add this
 
   @override
   void initState() {
@@ -37,16 +38,82 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
       _rating = widget.existingReview!.rating;
       _textController.text = widget.existingReview!.reviewText ?? '';
       _isAnonymous = widget.existingReview!.isAnonymous;
+    } else {
+      // 🛡️ Check if user already has a review for this doctor
+      _checkExistingReview();
     }
   }
 
-  @override
-  void dispose() {
-    _textController.dispose();
-    super.dispose();
+  // Add this method
+  Future<void> _checkExistingReview() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final hasReviewed = await _reviewService.hasUserReviewed(
+        widget.doctorId,
+        userId,
+      );
+
+      setState(() {
+        _hasExistingReview = hasReviewed;
+      });
+
+      if (hasReviewed) {
+        // Show dialog and navigate back
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showExistingReviewDialog();
+        });
+      }
+    } catch (e) {
+      print('Error checking existing review: $e');
+    }
+  }
+
+  void _showExistingReviewDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Review Already Exists'),
+        content: const Text(
+          'You have already reviewed this doctor. You can only submit one review per doctor.\n\n'
+          'To update your review, go to "My Reviews" and edit your existing review.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Go back to previous screen
+            },
+            child: const Text('OK'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Go back
+              // Navigate to user reviews
+              Navigator.pushNamed(context, '/user-reviews');
+            },
+            child: const Text('View My Reviews'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _submitReview() async {
+    // Prevent submission if user already has a review (double-check)
+    if (_hasExistingReview && widget.existingReview == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You have already reviewed this doctor'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate() || _rating == 0) {
       ScaffoldMessenger.of(
         context,
@@ -57,7 +124,6 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Get current user ID (you might need to adjust this based on your auth setup)
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not authenticated');
@@ -73,7 +139,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
           isAnonymous: _isAnonymous,
         );
       } else {
-        // Submit new review
+        // Submit new review (with built-in duplicate check)
         await _reviewService.submitReview(
           doctorId: widget.doctorId,
           patientId: userId,
@@ -98,9 +164,21 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = e.toString();
+        
+        // Handle specific duplicate review error
+        if (errorMessage.contains('already reviewed')) {
+          errorMessage = 'You have already reviewed this doctor. Please edit your existing review instead.';
+          
+          // Update local state
+          setState(() {
+            _hasExistingReview = true;
+          });
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
           ),
         );
