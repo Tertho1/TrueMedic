@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../widgets/base_scaffold.dart';
 // import '../loading_indicator.dart';
 import 'doctor_verification_screen.dart';
+import '../admin/admin_reports_screen.dart'; // Add this line
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -23,7 +24,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+    ); // Changed from 3 to 4
     _checkAdminRole();
     _fetchAllDoctors(); // Replace individual fetch with combined method
   }
@@ -100,10 +104,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             controller: _tabController,
             labelColor: Colors.blue.shade800,
             unselectedLabelColor: Colors.grey,
+            isScrollable: true, // Add this to make tabs scrollable
             tabs: const [
               Tab(text: 'Pending', icon: Icon(Icons.pending_actions)),
               Tab(text: 'Verified', icon: Icon(Icons.verified)),
               Tab(text: 'Rejected', icon: Icon(Icons.cancel)),
+              Tab(
+                text: 'Reports',
+                icon: Icon(Icons.report_problem),
+              ), // Add this tab
             ],
           ),
           Expanded(
@@ -114,6 +123,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 _buildRefreshableList(_pendingDoctors, isPending: true),
                 _buildRefreshableList(_verifiedDoctors),
                 _buildRefreshableList(_rejectedDoctors, isRejected: true),
+                const AdminReportsScreen(), // Add this tab
               ],
             ),
           ),
@@ -180,24 +190,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           color: Colors.white,
                         ),
                       ),
-                      title: Text(doctor['full_name'] ?? 'Unknown',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),),
+                      title: Text(
+                        doctor['full_name'] ?? 'Unknown',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('BMDC: ${doctor['bmdc_number']}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade700,
-                          ),),
-                          Text('Type: ${doctor['doctor_type'] ?? 'N/A'}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade700,
-                          ),),
+                          Text(
+                            'BMDC: ${doctor['bmdc_number']}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          Text(
+                            'Type: ${doctor['doctor_type'] ?? 'N/A'}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
                           if (isRejected && doctor['rejection_reason'] != null)
                             Text(
                               'Reason: ${doctor['rejection_reason']}',

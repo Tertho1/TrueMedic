@@ -23,6 +23,11 @@ import 'screens/home/doctor_resubmit_screen.dart'; // Import the doctor resubmit
 import 'screens/home/doctor_dashboard_screen.dart'; // Import the doctor dashboard screen
 import 'screens/home/doctor_appointment_details_screen.dart'; // Import the doctor appointment details screen
 // Import the app drawer
+import 'screens/reviews/write_review_screen.dart';
+import 'screens/reviews/doctor_reviews_screen.dart';
+import 'screens/reviews/user_reviews_screen.dart';
+import 'screens/reports/report_doctor_screen.dart';
+import 'screens/admin/admin_reports_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -128,6 +133,35 @@ class _MyAppState extends State<MyApp> {
               (context) => DoctorAppointmentDetailsScreen(
                 doctorId: ModalRoute.of(context)?.settings.arguments as String,
               ),
+          '/write-review': (context) {
+            final args =
+                ModalRoute.of(context)!.settings.arguments
+                    as Map<String, dynamic>?;
+            return WriteReviewScreen(
+              doctorId: args?['doctorId'] ?? '',
+              doctorName: args?['doctorName'] ?? '',
+            );
+          },
+          '/doctor-reviews': (context) {
+            final args =
+                ModalRoute.of(context)!.settings.arguments
+                    as Map<String, dynamic>?;
+            return DoctorReviewsScreen(
+              doctorId: args?['doctorId'] ?? '',
+              doctorName: args?['doctorName'] ?? '',
+            );
+          },
+          '/user-reviews': (context) => const UserReviewsScreen(),
+          '/report-doctor': (context) {
+            final args =
+                ModalRoute.of(context)!.settings.arguments
+                    as Map<String, dynamic>?;
+            return ReportDoctorScreen(
+              doctorBmdcNumber: args?['bmdcNumber'],
+              doctorName: args?['doctorName'],
+            );
+          },
+          '/admin-reports': (context) => const AdminReportsScreen(),
 
           // Add other routes as needed
         },
