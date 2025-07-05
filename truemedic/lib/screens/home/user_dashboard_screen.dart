@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../reviews/user_reviews_screen.dart';
-import '../reviews/write_review_screen.dart';
 import '../reports/report_doctor_screen.dart';
 
 class UserDashboardScreen extends StatefulWidget {

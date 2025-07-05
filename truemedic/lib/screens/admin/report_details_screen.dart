@@ -208,7 +208,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                               ),
                             ),
                           )
-                          .toList(),
+                          ,
                     ],
                   ),
                 ),

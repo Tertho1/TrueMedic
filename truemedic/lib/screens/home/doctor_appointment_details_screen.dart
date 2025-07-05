@@ -582,8 +582,9 @@ class _DoctorAppointmentDetailsScreenState
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       if (value?.isEmpty ?? true) return 'Required';
-                      if (int.tryParse(value!) == null)
+                      if (int.tryParse(value!) == null) {
                         return 'Must be a number';
+                      }
                       return null;
                     },
                     onChanged:
@@ -604,8 +605,9 @@ class _DoctorAppointmentDetailsScreenState
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       if (value?.isEmpty ?? true) return 'Required';
-                      if (int.tryParse(value!) == null)
+                      if (int.tryParse(value!) == null) {
                         return 'Must be a number';
+                      }
                       return null;
                     },
                     onChanged:

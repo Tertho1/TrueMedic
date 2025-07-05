@@ -35,11 +35,26 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   ReviewStats? _reviewStats;
   bool _loadingReviews = false;
 
+  // Registration check variables
+  String? _registeredDoctorId;
+  bool _isRegisteredDoctor = false;
+  Map<String, dynamic>? _appointmentInfo;
+  bool _loadingAppointmentInfo = false;
+
   @override
   void initState() {
     super.initState();
     _doctor = widget.doctor;
-    if (!widget.isFromLocal) _checkForUpdates();
+    if (!widget.isFromLocal) {
+      _checkForUpdates();
+    }
+    // Load review stats and appointment info
+    _loadDoctorReviewStats(_doctor.bmdcNumber).then((_) {
+      // Only load appointment info if doctor is registered
+      if (_isRegisteredDoctor && _registeredDoctorId != null) {
+        _loadDoctorAppointmentInfo(_registeredDoctorId);
+      }
+    });
   }
 
   Future<void> _checkForUpdates() async {
@@ -51,9 +66,11 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
         setState(() => _doctor = updatedDoctor);
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Update failed: ${e.toString()}')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Update failed: ${e.toString()}')),
+        );
+      }
     } finally {
       setState(() => _isUpdating = false);
     }
@@ -104,24 +121,328 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     setState(() => _loadingReviews = true);
 
     try {
-      // First, try to find doctor in our database by BMDC number
-      final doctorResponse =
+      // 🔍 DEBUG: Print what we're searching for
+      print(
+        '🔍 =================== DOCTOR REGISTRATION CHECK ===================',
+      );
+      print('🔍 Searching for BMDC: "$doctorBmdcNumber"');
+      print('🔍 BMDC type: ${doctorBmdcNumber.runtimeType}');
+      print('🔍 BMDC length: ${doctorBmdcNumber.length}');
+      print('🔍 BMDC characters: ${doctorBmdcNumber.split('').join(' ')}');
+
+      // Convert search term to string (ensure it's text)
+      final searchBmdcText = doctorBmdcNumber.toString();
+      print('🔍 Search BMDC as text: "$searchBmdcText"');
+
+      // First, let's see what BMDC numbers exist in doctors table
+      print('\n📊 =================== DATABASE INSPECTION ===================');
+      final allDoctorsResponse = await _supabaseClient
+          .from('doctors')
+          .select(
+            'id, bmdc_number, full_name, verified, verification_pending, rejected',
+          )
+          .order('created_at', ascending: false)
+          .limit(15);
+
+      print('📊 Total doctors found in database: ${allDoctorsResponse.length}');
+      print('📊 Sample doctors in database:');
+
+      for (int i = 0; i < allDoctorsResponse.length; i++) {
+        final doc = allDoctorsResponse[i];
+        final dbBmdc = doc['bmdc_number']?.toString() ?? 'null';
+        final dbBmdcLength = dbBmdc.length;
+        final dbBmdcChars = dbBmdc.split('').join(' ');
+
+        print('   ${i + 1}. ID: ${doc['id']}');
+        print('      BMDC: "$dbBmdc" (length: $dbBmdcLength)');
+        print('      BMDC chars: $dbBmdcChars');
+        print('      Name: ${doc['full_name']}');
+        print(
+          '      Verified: ${doc['verified']} | Pending: ${doc['verification_pending']} | Rejected: ${doc['rejected']}',
+        );
+        print('      Raw BMDC type: ${doc['bmdc_number'].runtimeType}');
+        print('   ---');
+      }
+
+      // Get counts for verification status
+      final verifiedCount =
+          allDoctorsResponse.where((doc) => doc['verified'] == true).length;
+      final pendingCount =
+          allDoctorsResponse
+              .where((doc) => doc['verification_pending'] == true)
+              .length;
+      final rejectedCount =
+          allDoctorsResponse.where((doc) => doc['rejected'] == true).length;
+
+      print('\n📊 Doctor Status Summary:');
+      print('   ✅ Verified: $verifiedCount');
+      print('   ⏳ Pending: $pendingCount');
+      print('   ❌ Rejected: $rejectedCount');
+
+      // Extract just the numbers from the search term for flexible matching
+      final searchNumbers = searchBmdcText.replaceAll(RegExp(r'[^0-9]'), '');
+      print(
+        '\n🔢 Search numbers only: "$searchNumbers" (length: ${searchNumbers.length})',
+      );
+
+      // Try multiple search strategies
+      Map<String, dynamic>? registeredDoctorResponse;
+
+      // Strategy 1: Exact match (search term as-is)
+      print(
+        '\n🎯 =================== STRATEGY 1: EXACT MATCH ===================',
+      );
+      print('🎯 Searching for exact match: "$searchBmdcText"');
+
+      registeredDoctorResponse =
           await _supabaseClient
               .from('doctors')
-              .select('id')
-              .eq('bmdc_number', doctorBmdcNumber)
+              .select(
+                'id, verified, full_name, bmdc_number, verification_pending, rejected',
+              )
+              .eq('bmdc_number', searchBmdcText)
               .maybeSingle();
 
-      if (doctorResponse != null) {
-        final doctorId = doctorResponse['id'];
-        final stats = await _reviewService.getDoctorReviewStats(doctorId);
-        setState(() => _reviewStats = stats);
+      if (registeredDoctorResponse != null) {
+        print(
+          '🎯 Strategy 1 found doctor: ${registeredDoctorResponse['full_name']}',
+        );
+        print(
+          '🎯 Doctor verification status: verified=${registeredDoctorResponse['verified']}, pending=${registeredDoctorResponse['verification_pending']}, rejected=${registeredDoctorResponse['rejected']}',
+        );
+      } else {
+        print('🎯 Strategy 1 result: No exact match found');
       }
+
+      // Strategy 2: Manual comparison with numbers extraction
+      if (registeredDoctorResponse == null && searchNumbers.isNotEmpty) {
+        print(
+          '\n🎯 =================== STRATEGY 2: NUMBER COMPARISON ===================',
+        );
+        print(
+          '🎯 Comparing search numbers "$searchNumbers" with all doctors...',
+        );
+
+        // Get ALL doctors for comparison (not just verified ones)
+        final allDoctorsForComparison = await _supabaseClient
+            .from('doctors')
+            .select(
+              'id, verified, full_name, bmdc_number, verification_pending, rejected',
+            );
+
+        print(
+          '🔍 Comparing with ${allDoctorsForComparison.length} total doctors:',
+        );
+
+        for (var doc in allDoctorsForComparison) {
+          final dbBmdcText = doc['bmdc_number']?.toString() ?? '';
+          final dbNumbers = dbBmdcText.replaceAll(RegExp(r'[^0-9]'), '');
+
+          print('   DB BMDC: "$dbBmdcText" -> Numbers: "$dbNumbers"');
+          print(
+            '   Comparing: "$searchNumbers" == "$dbNumbers" ? ${searchNumbers == dbNumbers}',
+          );
+          print(
+            '   Doctor: ${doc['full_name']} (verified: ${doc['verified']})',
+          );
+
+          if (dbNumbers == searchNumbers && searchNumbers.isNotEmpty) {
+            registeredDoctorResponse = doc;
+            print('✅ Found match via number comparison!');
+            print('✅ Matched doctor: ${doc['full_name']}');
+            print(
+              '✅ Doctor status: verified=${doc['verified']}, pending=${doc['verification_pending']}, rejected=${doc['rejected']}',
+            );
+            break;
+          }
+          print('   ---');
+        }
+
+        if (registeredDoctorResponse == null) {
+          print('❌ No match found via number comparison');
+        }
+      }
+
+      // Strategy 3: Try with common prefixes (fallback)
+      if (registeredDoctorResponse == null && searchNumbers.isNotEmpty) {
+        print(
+          '\n🎯 =================== STRATEGY 3: PREFIX MATCHING ===================',
+        );
+        final prefixes = [
+          'A-',
+          'BMDC-',
+          'B-',
+          'M-',
+          'a-',
+          'bmdc-',
+          'A',
+          'B',
+          'M',
+        ];
+
+        for (String prefix in prefixes) {
+          final testBmdc = prefix + searchNumbers;
+          print('   Testing: "$testBmdc"');
+
+          registeredDoctorResponse =
+              await _supabaseClient
+                  .from('doctors')
+                  .select(
+                    'id, verified, full_name, bmdc_number, verification_pending, rejected',
+                  )
+                  .eq('bmdc_number', testBmdc)
+                  .maybeSingle();
+
+          if (registeredDoctorResponse != null) {
+            print('✅ Found match with prefix "$prefix": "$testBmdc"');
+            print('✅ Doctor: ${registeredDoctorResponse['full_name']}');
+            print(
+              '✅ Status: verified=${registeredDoctorResponse['verified']}, pending=${registeredDoctorResponse['verification_pending']}, rejected=${registeredDoctorResponse['rejected']}',
+            );
+            break;
+          }
+        }
+
+        if (registeredDoctorResponse == null) {
+          print('❌ No match found with prefixes');
+        }
+      }
+
+      // Strategy 4: Case-insensitive search using ilike
+      if (registeredDoctorResponse == null && searchNumbers.isNotEmpty) {
+        print(
+          '\n🎯 =================== STRATEGY 4: PATTERN MATCHING ===================',
+        );
+        print('🎯 Searching with ilike pattern: "%$searchNumbers%"');
+
+        // Try pattern matching with ilike
+        registeredDoctorResponse =
+            await _supabaseClient
+                .from('doctors')
+                .select(
+                  'id, verified, full_name, bmdc_number, verification_pending, rejected',
+                )
+                .ilike('bmdc_number', '%$searchNumbers%')
+                .maybeSingle();
+
+        if (registeredDoctorResponse != null) {
+          print('✅ Found match with pattern matching');
+          print('✅ Doctor: ${registeredDoctorResponse['full_name']}');
+          print('✅ BMDC: ${registeredDoctorResponse['bmdc_number']}');
+          print(
+            '✅ Status: verified=${registeredDoctorResponse['verified']}, pending=${registeredDoctorResponse['verification_pending']}, rejected=${registeredDoctorResponse['rejected']}',
+          );
+        } else {
+          print('❌ No match found with pattern matching');
+        }
+      }
+
+      // Final evaluation
+      print('\n🏁 =================== FINAL EVALUATION ===================');
+      if (registeredDoctorResponse != null) {
+        print('✅ Doctor found in database!');
+        print('✅ Doctor ID: ${registeredDoctorResponse['id']}');
+        print('✅ Doctor Name: ${registeredDoctorResponse['full_name']}');
+        print('✅ BMDC in DB: ${registeredDoctorResponse['bmdc_number']}');
+        print('✅ Verification Status:');
+        print('   - Verified: ${registeredDoctorResponse['verified']}');
+        print(
+          '   - Pending: ${registeredDoctorResponse['verification_pending']}',
+        );
+        print('   - Rejected: ${registeredDoctorResponse['rejected']}');
+
+        // Check if doctor is verified
+        final isVerified = registeredDoctorResponse['verified'] == true;
+        print('✅ Is doctor verified and eligible for reviews? $isVerified');
+
+        if (isVerified) {
+          // Doctor found and verified - load reviews
+          final doctorId = registeredDoctorResponse['id'];
+          final stats = await _reviewService.getDoctorReviewStats(doctorId);
+          setState(() {
+            _reviewStats = stats;
+            _registeredDoctorId = doctorId;
+            _isRegisteredDoctor = true;
+          });
+          print('✅ Doctor is registered and verified - reviews loaded');
+        } else {
+          setState(() {
+            _reviewStats = null;
+            _registeredDoctorId = null;
+            _isRegisteredDoctor = false;
+          });
+          print('⚠️  Doctor found but not verified yet');
+        }
+      } else {
+        setState(() {
+          _reviewStats = null;
+          _registeredDoctorId = null;
+          _isRegisteredDoctor = false;
+        });
+        print('❌ Doctor not found in TrueMedic database');
+      }
+
+      print('🏁 =================== SEARCH COMPLETE ===================\n');
     } catch (e) {
-      // Handle error silently - doctor might not be registered for reviews yet
-      print('Error loading review stats: $e');
+      print('💥 Error loading review stats: $e');
+      print('💥 Error type: ${e.runtimeType}');
+      print('💥 Stack trace: ${StackTrace.current}');
+      setState(() {
+        _reviewStats = null;
+        _registeredDoctorId = null;
+        _isRegisteredDoctor = false;
+      });
     } finally {
       setState(() => _loadingReviews = false);
+    }
+  }
+
+  Future<void> _loadDoctorAppointmentInfo(String? doctorId) async {
+    if (doctorId == null) return;
+
+    setState(() => _loadingAppointmentInfo = true);
+
+    try {
+      // Load appointment details and locations
+      final appointmentResponse =
+          await _supabaseClient
+              .from('doctor_appointments')
+              .select('''
+            id,
+            designation,
+            specialities,
+            experience
+          ''')
+              .eq('doctor_id', doctorId)
+              .maybeSingle();
+
+      if (appointmentResponse != null) {
+        // Load appointment locations
+        final locationsResponse = await _supabaseClient
+            .from('appointment_locations')
+            .select('''
+              location_name,
+              address,
+              contact_number,
+              start_time,
+              end_time,
+              available_days,
+              max_appointments_per_day,
+              appointment_duration
+            ''')
+            .eq('doctor_appointment_id', appointmentResponse['id']);
+
+        setState(() {
+          _appointmentInfo = {
+            ...appointmentResponse,
+            'locations': locationsResponse,
+          };
+        });
+      }
+    } catch (e) {
+      print('Error loading appointment info: $e');
+    } finally {
+      setState(() => _loadingAppointmentInfo = false);
     }
   }
 
@@ -167,8 +488,161 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
             ),
           const SizedBox(height: 20),
 
-          // Reviews Section
-          if (_reviewStats != null) ...[
+          // Doctor Status Card
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            color:
+                _isRegisteredDoctor
+                    ? Colors.green.shade50
+                    : Colors.orange.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _isRegisteredDoctor ? Icons.verified : Icons.info,
+                        color:
+                            _isRegisteredDoctor ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isRegisteredDoctor
+                            ? 'Verified TrueMedic Doctor'
+                            : 'BMDC Verified Doctor',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color:
+                              _isRegisteredDoctor
+                                  ? Colors.green.shade700
+                                  : Colors.orange.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _isRegisteredDoctor
+                        ? 'This doctor is registered and verified on TrueMedic. You can view reviews and book appointments.'
+                        : 'This doctor is verified by BMDC but not yet registered on TrueMedic. Encourage them to join!',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Reviews Section (only for registered doctors)
+          if (_isRegisteredDoctor) ...[
+            if (_reviewStats != null) ...[
+              Card(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.star, color: Colors.amber, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${_reviewStats!.averageRating.toStringAsFixed(1)} / 5.0',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '(${_reviewStats!.totalReviews} reviews)',
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: List.generate(5, (index) {
+                          return Icon(
+                            index < _reviewStats!.averageRating
+                                ? Icons.star
+                                : Icons.star_border,
+                            color: Colors.amber,
+                            size: 16,
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _navigateToReviews(),
+                              icon: const Icon(Icons.reviews),
+                              label: const Text('See Reviews'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _navigateToWriteReview(),
+                              icon: const Icon(Icons.rate_review),
+                              label: const Text('Write Review'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else if (!_loadingReviews) ...[
+              Card(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'No reviews yet',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _navigateToWriteReview(),
+                              icon: const Icon(Icons.rate_review),
+                              label: const Text('Be the First to Review'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+
+          // Appointment Information (only for registered doctors and logged-in users)
+          if (_isRegisteredDoctor && _appointmentInfo != null) ...[
             Card(
               margin: const EdgeInsets.symmetric(vertical: 8),
               child: Padding(
@@ -178,92 +652,90 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 20),
+                        const Icon(Icons.local_hospital, color: Colors.teal),
                         const SizedBox(width: 8),
-                        Text(
-                          '${_reviewStats!.averageRating.toStringAsFixed(1)} / 5.0',
-                          style: const TextStyle(
+                        const Text(
+                          'Professional Information',
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '(${_reviewStats!.totalReviews} reviews)',
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
                       ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: List.generate(5, (index) {
-                        return Icon(
-                          index < _reviewStats!.averageRating
-                              ? Icons.star
-                              : Icons.star_border,
-                          color: Colors.amber,
-                          size: 16,
-                        );
-                      }),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _navigateToReviews(),
-                            icon: const Icon(Icons.reviews),
-                            label: const Text('See Reviews'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
+
+                    // Professional Details
+                    if (_appointmentInfo!['designation'] != null) ...[
+                      _buildInfoRow(
+                        'Designation',
+                        _appointmentInfo!['designation'] ?? 'N/A',
+                      ),
+                    ],
+                    if (_appointmentInfo!['specialities'] != null) ...[
+                      _buildInfoRow(
+                        'Specialities',
+                        _formatSpecialities(_appointmentInfo!['specialities']),
+                      ),
+                    ],
+                    if (_appointmentInfo!['experience'] != null) ...[
+                      _buildInfoRow(
+                        'Experience',
+                        '${_appointmentInfo!['experience']} years',
+                      ),
+                    ],
+
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          // TODO: Implement appointment booking
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Appointment booking coming soon!'),
                             ),
-                          ),
+                          );
+                        },
+                        icon: const Icon(Icons.calendar_month),
+                        label: const Text('Book Appointment'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _navigateToWriteReview(),
-                            icon: const Icon(Icons.rate_review),
-                            label: const Text('Write Review'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-          ] else if (!_loadingReviews) ...[
+          ] else if (_isRegisteredDoctor && _loadingAppointmentInfo) ...[
+            const Card(
+              margin: EdgeInsets.symmetric(vertical: 8),
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ),
+          ] else if (_isRegisteredDoctor && _appointmentInfo == null) ...[
             Card(
               margin: const EdgeInsets.symmetric(vertical: 8),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
+                    const Icon(Icons.info, color: Colors.grey, size: 32),
+                    const SizedBox(height: 8),
                     const Text(
-                      'No reviews yet',
+                      'Appointment information not available',
                       style: TextStyle(fontSize: 16, color: Colors.grey),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _navigateToWriteReview(),
-                            icon: const Icon(Icons.rate_review),
-                            label: const Text('Be the First to Review'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 4),
+                    const Text(
+                      'This doctor hasn\'t set up appointment details yet',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
@@ -271,7 +743,58 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
             ),
           ],
 
-          // Report Section
+          // Registration Invitation (only for non-registered doctors)
+          if (!_isRegisteredDoctor) ...[
+            Card(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              color: Colors.blue.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.person_add, color: Colors.blue.shade700),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Invite to TrueMedic',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Help patients by encouraging this doctor to join TrueMedic for reviews and appointment booking.',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Invitation feature coming soon!'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.share),
+                      label: const Text('Invite Doctor'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
+          // Report Section (for all doctors)
           Card(
             margin: const EdgeInsets.symmetric(vertical: 8),
             color: Colors.red.shade50,
@@ -348,6 +871,53 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     );
   }
 
+  // ADD THIS HELPER METHOD:
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
+  String _formatSpecialities(dynamic specialities) {
+    if (specialities == null) return 'N/A';
+
+    // Handle different data types
+    if (specialities is String) {
+      // If it's already a string, return it as-is
+      return specialities;
+    } else if (specialities is List) {
+      // If it's a list, process each item
+      return specialities
+          .map((item) {
+            if (item is String) {
+              return item;
+            } else if (item is Map && item.containsKey('name')) {
+              return item['name']?.toString() ?? '';
+            } else {
+              return item.toString();
+            }
+          })
+          .where((s) => s.isNotEmpty)
+          .join(', ');
+    } else {
+      // Fallback: convert to string
+      return specialities.toString();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -366,22 +936,37 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   }
 
   void _navigateToReviews() {
-    // Find doctor in database first
-    _findDoctorIdAndNavigate((doctorId) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => DoctorReviewsScreen(
-                doctorId: doctorId,
-                doctorName: _doctor.fullName,
-              ),
+    if (_registeredDoctorId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This doctor is not registered on TrueMedic yet'),
         ),
       );
-    });
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => DoctorReviewsScreen(
+              doctorId: _registeredDoctorId!,
+              doctorName: _doctor.fullName,
+            ),
+      ),
+    );
   }
 
   void _navigateToWriteReview() {
+    if (_registeredDoctorId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This doctor is not registered on TrueMedic yet'),
+        ),
+      );
+      return;
+    }
+
     // Check if user is logged in
     final supabase = Supabase.instance.client;
     if (supabase.auth.currentUser == null) {
@@ -389,21 +974,19 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
       return;
     }
 
-    _findDoctorIdAndNavigate((doctorId) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => WriteReviewScreen(
-                doctorId: doctorId,
-                doctorName: _doctor.fullName,
-              ),
-        ),
-      ).then((result) {
-        if (result == true) {
-          _loadDoctorReviewStats(_doctor.bmdcNumber); // Refresh reviews
-        }
-      });
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => WriteReviewScreen(
+              doctorId: _registeredDoctorId!,
+              doctorName: _doctor.fullName,
+            ),
+      ),
+    ).then((result) {
+      if (result == true) {
+        _loadDoctorReviewStats(_doctor.bmdcNumber); // Refresh reviews
+      }
     });
   }
 
@@ -418,31 +1001,6 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
             ),
       ),
     );
-  }
-
-  void _findDoctorIdAndNavigate(Function(String) callback) async {
-    try {
-      final doctorResponse =
-          await _supabaseClient
-              .from('doctors')
-              .select('id')
-              .eq('bmdc_number', _doctor.bmdcNumber)
-              .maybeSingle();
-
-      if (doctorResponse != null) {
-        callback(doctorResponse['id']);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This doctor is not registered in our system yet'),
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
-    }
   }
 
   void _showLoginPrompt(String action) {
@@ -507,17 +1065,17 @@ class Doctor {
     final rawDob = json['dob'] ?? 'N/A';
     final rawBirthYear = json['birth_year'] ?? rawDob; // Prioritize birth_year
     final rawimage = json['doctor_image_base64'] ?? json['image_base64'] ?? '';
-    // Extract BMDC number
-    String bmdcNumberOnly = 'N/A';
-    final bmdcParts = RegExp(r'\d+').firstMatch(rawBmdcNumber);
-    if (bmdcParts != null) bmdcNumberOnly = bmdcParts.group(0)!;
 
-    // Process name capitalization
-    // String formattedName = rawFullName != 'N/A'
-    //     ? rawFullName.toLowerCase().split(' ').map((w) => w.isNotEmpty
-    //         ? w[0].toUpperCase() + w.substring(1)
-    //         : '').join(' ')
-    //     : 'N/A';
+    // 🔍 DEBUG: Show what we received from API
+    print('🔍 Raw BMDC from API: "$rawBmdcNumber"');
+
+    // Extract BMDC number and convert to string properly
+    String bmdcNumberOnly = 'N/A';
+    final bmdcParts = RegExp(r'\d+').firstMatch(rawBmdcNumber.toString());
+    if (bmdcParts != null) {
+      bmdcNumberOnly = bmdcParts.group(0)!.toString(); // Ensure it's a string
+      print('🔍 Extracted BMDC (numbers only): "$bmdcNumberOnly"');
+    }
 
     // Process birth year from "DD/MM/YYYY" format
     String birthYearExtracted = 'N/A';
@@ -528,7 +1086,7 @@ class Doctor {
     }
 
     return Doctor(
-      bmdcNumber: bmdcNumberOnly,
+      bmdcNumber: bmdcNumberOnly, // This is a string like "120233"
       fullName: rawFullName,
       fatherName: json['father_name'] ?? 'N/A',
       motherName: json['mother_name'] ?? 'N/A',

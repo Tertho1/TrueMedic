@@ -26,7 +26,7 @@ class _ReportDoctorScreenState extends State<ReportDoctorScreen> {
   bool _isAnonymous = false;
   bool _isLoading = false;
   bool _isSubmitting = false;
-  List<PlatformFile> _evidenceFiles = [];
+  final List<PlatformFile> _evidenceFiles = [];
 
   @override
   void initState() {
