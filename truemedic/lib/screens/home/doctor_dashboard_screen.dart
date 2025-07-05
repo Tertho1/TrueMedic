@@ -596,6 +596,22 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     return '${_getDayName(today.weekday)}, ${today.day} ${months[today.month - 1]} ${today.year}';
   }
 
+  // Add this helper method to your _DoctorDashboardScreenState class
+  String _formatTime12Hour(String time24) {
+    try {
+      final parts = time24.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final hour12 = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+
+      return '$hour12:${minute.toString().padLeft(2, '0')} $period';
+    } catch (e) {
+      return time24; // Return original if parsing fails
+    }
+  }
+
   Widget _buildTodaysScheduleCard() {
     final today = DateTime.now();
     final dayName = _getDayName(today.weekday);
@@ -774,7 +790,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                 ),
               ),
               Text(
-                '${location['start_time']} - ${location['end_time']}',
+                '${_formatTime12Hour(location['start_time'])} - ${_formatTime12Hour(location['end_time'])}', // Updated this line
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.blue.shade800,
@@ -901,7 +917,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               Icon(Icons.access_time, size: 16, color: Colors.blue.shade600),
               const SizedBox(width: 4),
               Text(
-                '${location['start_time']} - ${location['end_time']}',
+                '${_formatTime12Hour(location['start_time'])} - ${_formatTime12Hour(location['end_time'])}', // Updated this line
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.blue.shade800,
@@ -990,9 +1006,9 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           'Today\'s Schedule',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1461,24 +1477,25 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   }
 
   Widget _buildAppointmentDetailsCard() {
-    if (_loadingAppointmentDetails) {
-      return Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: const Padding(
-          padding: EdgeInsets.all(40),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
-
-    return _AppointmentDetailsCard(
-      appointmentDetails: _appointmentDetails,
-      appointmentLocations: _appointmentLocations,
-      buildDetailRow: _buildDetailRow,
-      onEditPressed: _navigateToAppointmentDetails,
+  if (_loadingAppointmentDetails) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: const Padding(
+        padding: EdgeInsets.all(40),
+        child: Center(child: CircularProgressIndicator()),
+      ),
     );
   }
+
+  return _AppointmentDetailsCard(
+    appointmentDetails: _appointmentDetails,
+    appointmentLocations: _appointmentLocations,
+    buildDetailRow: _buildDetailRow,
+    onEditPressed: _navigateToAppointmentDetails,
+    formatTime12Hour: _formatTime12Hour, // Add this line
+  );
+}
 
   Widget _buildDetailRow(String label, String value, IconData icon) {
     return Padding(
@@ -1680,12 +1697,14 @@ class _AppointmentDetailsCard extends StatefulWidget {
   final List<Map<String, dynamic>> appointmentLocations;
   final Widget Function(String, String, IconData) buildDetailRow;
   final VoidCallback onEditPressed;
+  final String Function(String) formatTime12Hour; // Add this line
 
   const _AppointmentDetailsCard({
     required this.appointmentDetails,
     required this.appointmentLocations,
     required this.buildDetailRow,
     required this.onEditPressed,
+    required this.formatTime12Hour, // Add this line
   });
 
   @override
@@ -1694,6 +1713,10 @@ class _AppointmentDetailsCard extends StatefulWidget {
 
 class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
   bool isExpanded = false;
+
+  String _formatTime12Hour(String time24) {
+    return widget.formatTime12Hour(time24);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1798,23 +1821,23 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Professional details
-                  widget.buildDetailRow(
-                    'Designation',
-                    widget.appointmentDetails!['designation'] ?? 'Not set',
-                    Icons.business_center,
-                  ),
-                  widget.buildDetailRow(
-                    'Specialities',
-                    widget.appointmentDetails!['specialities'] ?? 'Not set',
-                    Icons.local_hospital,
-                  ),
-                  widget.buildDetailRow(
-                    'Experience',
-                    '${widget.appointmentDetails!['experience'] ?? 0} years',
-                    Icons.timeline,
-                  ),
+                  // widget.buildDetailRow(
+                  //   'Designation',
+                  //   widget.appointmentDetails!['designation'] ?? 'Not set',
+                  //   Icons.business_center,
+                  // ),
+                  // widget.buildDetailRow(
+                  //   'Specialities',
+                  //   widget.appointmentDetails!['specialities'] ?? 'Not set',
+                  //   Icons.local_hospital,
+                  // ),
+                  // widget.buildDetailRow(
+                  //   'Experience',
+                  //   '${widget.appointmentDetails!['experience'] ?? 0} years',
+                  //   Icons.timeline,
+                  // ),
 
-                  const SizedBox(height: 12),
+                  // const SizedBox(height: 12),
 
                   // Location-specific details
                   Row(
@@ -1907,7 +1930,7 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Location name and basic info in compact form
+          // Location name and time in one row
           Row(
             children: [
               Expanded(
@@ -1921,11 +1944,11 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                 ),
               ),
               Text(
-                '${location['start_time']} - ${location['end_time']}',
+                '${_formatTime12Hour(location['start_time'])} - ${_formatTime12Hour(location['end_time'])}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade700,
-                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
@@ -1934,19 +1957,16 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
           // Address
           if (location['address'] != null &&
               location['address'].toString().isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.place, size: 12, color: Colors.grey.shade600),
+                Icon(Icons.place, size: 14, color: Colors.grey.shade600),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     location['address'],
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1955,58 +1975,48 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
             ),
           ],
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
 
-          // Compact info row
+          // Appointment duration and max appointments info
           Row(
             children: [
-              Icon(Icons.timer, size: 14, color: Colors.grey.shade600),
+              Icon(Icons.timer, size: 14, color: Colors.blue.shade600),
               const SizedBox(width: 4),
               Text(
-                '${location['appointment_duration']}min',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                '${location['appointment_duration']}min slots',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
               ),
               const SizedBox(width: 12),
-              Icon(Icons.event, size: 14, color: Colors.grey.shade600),
+              Icon(Icons.event, size: 14, color: Colors.blue.shade600),
               const SizedBox(width: 4),
               Text(
-                'Max ${location['max_appointments_per_day']}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-              ),
-              const SizedBox(width: 12),
-              Icon(
-                Icons.calendar_today,
-                size: 14,
-                color: Colors.grey.shade600,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${availableDays.length} days',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                'Max ${location['max_appointments_per_day']}/day',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
               ),
             ],
           ),
 
-          // Available days - THIS IS THE MISSING SECTION
+          // Available days - ADD THIS SECTION
           if (availableDays.isNotEmpty) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade600),
+                Icon(Icons.calendar_today, size: 14, color: Colors.green.shade600),
                 const SizedBox(width: 4),
                 Text(
                   'Days: ',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade700,
                   ),
                 ),
                 Expanded(
                   child: Wrap(
-                    spacing: 3,
+                    spacing: 4,
                     runSpacing: 2,
-                    children: availableDays.take(3).map((day) => Container(
+                    children: availableDays.take(4).map((day) => Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                       decoration: BoxDecoration(
                         color: Colors.teal.shade100,
@@ -2014,9 +2024,9 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                         border: Border.all(color: Colors.teal.shade300),
                       ),
                       child: Text(
-                        day.toString().substring(0, 3), // Show first 3 letters
+                        day.toString().length > 3 ? day.toString().substring(0, 3) : day.toString(),
                         style: TextStyle(
-                          fontSize: 9,
+                          fontSize: 10,
                           color: Colors.teal.shade700,
                           fontWeight: FontWeight.w500,
                         ),
@@ -2024,23 +2034,27 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
                     )).toList(),
                   ),
                 ),
-                if (availableDays.length > 3)
-                  Text(
-                    '+${availableDays.length - 3} more',
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: Colors.grey.shade600,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
               ],
             ),
+            // Show "+X more" if there are more than 4 days
+            if (availableDays.length > 4)
+              Padding(
+                padding: const EdgeInsets.only(top: 2, left: 18),
+                child: Text(
+                  '+${availableDays.length - 4} more days',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey.shade600,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
           ] else
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: 6),
               child: Row(
                 children: [
-                  Icon(Icons.calendar_today, size: 12, color: Colors.orange.shade600),
+                  Icon(Icons.calendar_today, size: 14, color: Colors.orange.shade600),
                   const SizedBox(width: 4),
                   Text(
                     'No days selected',
@@ -2057,14 +2071,14 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
           // Contact number if available
           if (location['contact_number'] != null &&
               location['contact_number'].toString().isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Row(
               children: [
-                Icon(Icons.phone, size: 12, color: Colors.grey.shade600),
+                Icon(Icons.phone, size: 14, color: Colors.blue.shade600),
                 const SizedBox(width: 4),
                 Text(
                   location['contact_number'],
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                 ),
               ],
             ),
@@ -2082,74 +2096,73 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder:
-          (context) => DraggableScrollableSheet(
-            initialChildSize: 0.7,
-            minChildSize: 0.5,
-            maxChildSize: 0.95,
-            expand: false,
-            builder: (context, scrollController) {
-              return Container(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Handle bar
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'All Appointment Locations',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      '${widget.appointmentLocations.length} locations configured',
+                    const Text(
+                      'All Appointment Locations',
                       style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 14,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Divider(),
-                    const SizedBox(height: 8),
-
-                    // All locations list
-                    Expanded(
-                      child: ListView.builder(
-                        controller: scrollController,
-                        itemCount: widget.appointmentLocations.length,
-                        itemBuilder: (context, index) {
-                          final location = widget.appointmentLocations[index];
-                          return _buildDetailedLocationTile(location);
-                        },
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
-              );
-            },
-          ),
+                Text(
+                  '${widget.appointmentLocations.length} locations configured',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
+                  ),
+                ),
+                const Divider(),
+                const SizedBox(height: 8),
+
+                // All locations list
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: widget.appointmentLocations.length,
+                    itemBuilder: (context, index) {
+                      final location = widget.appointmentLocations[index];
+                      return _buildDetailedLocationTile(location);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -2202,7 +2215,7 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
               Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
               const SizedBox(width: 4),
               Text(
-                '${location['start_time']} - ${location['end_time']}',
+                '${_formatTime12Hour(location['start_time'])} - ${_formatTime12Hour(location['end_time'])}', // Updated this line
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey.shade700,
@@ -2249,30 +2262,29 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
             Wrap(
               spacing: 4,
               runSpacing: 2,
-              children:
-                  availableDays
-                      .map(
-                        (day) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.teal.shade100,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.teal.shade300),
-                          ),
-                          child: Text(
-                            day.toString(),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.teal.shade700,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+              children: availableDays
+                  .map(
+                    (day) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.teal.shade300),
+                      ),
+                      child: Text(
+                        day.toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.teal.shade700,
+                          fontWeight: FontWeight.w500,
                         ),
-                      )
-                      .toList(),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ] else
             Text(
