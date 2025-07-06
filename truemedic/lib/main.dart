@@ -21,12 +21,9 @@ import 'screens/auth/verification_pending_screen.dart'; // Import the verificati
 // Import the doctor verification screen
 import 'screens/home/doctor_resubmit_screen.dart'; // Import the doctor resubmit screen
 import 'screens/home/doctor_dashboard_screen.dart'; // Import the doctor dashboard screen
-import 'screens/home/doctor_appointment_details_screen.dart'; // Import the doctor appointment details screen
+// Import the doctor appointment details screen
 // Import the app drawer
-import 'screens/reviews/write_review_screen.dart';
-import 'screens/reviews/doctor_reviews_screen.dart';
 import 'screens/reviews/user_reviews_screen.dart';
-import 'screens/reports/report_doctor_screen.dart';
 import 'screens/admin/admin_reports_screen.dart';
 
 void main() async {
@@ -100,10 +97,36 @@ class _MyAppState extends State<MyApp> {
           primarySwatch: Colors.blue,
           textTheme: GoogleFonts.poppinsTextTheme(),
         ),
-        initialRoute: '/splash', // Changed from '/' to '/splash'
+        initialRoute: '/splash',
+        onGenerateRoute: (settings) {
+          print('🔍 Navigating to: ${settings.name}');
+
+          // Handle routes that need arguments
+          switch (settings.name) {
+            case '/edit-profile':
+              final args = settings.arguments as Map<String, dynamic>?;
+              if (args != null) {
+                return MaterialPageRoute(
+                  builder: (context) => EditProfileScreen(userProfile: args),
+                  settings: settings,
+                );
+              }
+              break;
+            case '/doctor-resubmit':
+              final args = settings.arguments as Map<String, dynamic>?;
+              if (args != null) {
+                return MaterialPageRoute(
+                  builder: (context) => DoctorResubmitScreen(doctorData: args),
+                  settings: settings,
+                );
+              }
+              break;
+          }
+
+          return null;
+        },
         routes: {
-          '/splash':
-              (context) => const SplashScreen(), // Add splash screen route
+          '/splash': (context) => const SplashScreen(),
           '/': (context) => const WelcomeScreen(),
           '/user-or-doctor': (context) => const UserOrDoctorScreen(),
           '/user-login': (context) => const UserLoginScreen(),
@@ -113,57 +136,11 @@ class _MyAppState extends State<MyApp> {
           '/home': (context) => const HomeScreen(),
           '/admin-dashboard': (context) => const AdminDashboardScreen(),
           '/user-dashboard': (context) => const UserDashboardScreen(),
-          '/edit-profile':
-              (context) => EditProfileScreen(
-                userProfile:
-                    ModalRoute.of(context)?.settings.arguments
-                        as Map<String, dynamic>,
-              ),
           '/password-reset': (context) => const PasswordResetScreen(),
-          '/verification-pending':
-              (context) => const VerificationPendingScreen(),
-          '/doctor-resubmit': (context) {
-            final args =
-                ModalRoute.of(context)!.settings.arguments
-                    as Map<String, dynamic>;
-            return DoctorResubmitScreen(doctorData: args);
-          },
+          '/verification-pending': (context) => const VerificationPendingScreen(),
           '/doctor-dashboard': (context) => const DoctorDashboardScreen(),
-          '/doctor-appointment-details':
-              (context) => DoctorAppointmentDetailsScreen(
-                doctorId: ModalRoute.of(context)?.settings.arguments as String,
-              ),
-          '/write-review': (context) {
-            final args =
-                ModalRoute.of(context)!.settings.arguments
-                    as Map<String, dynamic>?;
-            return WriteReviewScreen(
-              doctorId: args?['doctorId'] ?? '',
-              doctorName: args?['doctorName'] ?? '',
-            );
-          },
-          '/doctor-reviews': (context) {
-            final args =
-                ModalRoute.of(context)!.settings.arguments
-                    as Map<String, dynamic>?;
-            return DoctorReviewsScreen(
-              doctorId: args?['doctorId'] ?? '',
-              doctorName: args?['doctorName'] ?? '',
-            );
-          },
           '/user-reviews': (context) => const UserReviewsScreen(),
-          '/report-doctor': (context) {
-            final args =
-                ModalRoute.of(context)!.settings.arguments
-                    as Map<String, dynamic>?;
-            return ReportDoctorScreen(
-              doctorBmdcNumber: args?['bmdcNumber'],
-              doctorName: args?['doctorName'],
-            );
-          },
           '/admin-reports': (context) => const AdminReportsScreen(),
-
-          // Add other routes as needed
         },
       ),
     );

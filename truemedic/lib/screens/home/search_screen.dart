@@ -716,7 +716,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
               Row(
                 children: [
                   Text(
-                    '${_reviewStats!.averageRating.toStringAsFixed(1)}',
+                    _reviewStats!.averageRating.toStringAsFixed(1),
                     style: GoogleFonts.poppins(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,

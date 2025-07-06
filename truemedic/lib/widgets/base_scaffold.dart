@@ -6,13 +6,15 @@ class BaseScaffold extends StatelessWidget {
   final Widget body;
   final List<Widget>? actions;
   final bool showDrawer;
+  final bool showBackButton;
 
   const BaseScaffold({
     super.key,
     required this.title,
     required this.body,
     this.actions,
-    this.showDrawer = true, // ✅ ADD: Enable drawer by default
+    this.showDrawer = true,
+    this.showBackButton = true, // ✅ ADD: Control back button
   });
 
   @override
@@ -25,8 +27,24 @@ class BaseScaffold extends StatelessWidget {
         backgroundColor: Colors.teal.shade600,
         foregroundColor: Colors.white,
         actions: actions,
-        // ✅ ENSURE: Drawer icon shows when drawer is enabled
-        automaticallyImplyLeading: showDrawer,
+        // ✅ FIX: Better back button handling
+        leading: showDrawer
+            ? null // Let Flutter handle drawer icon
+            : showBackButton
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      // Check if we can pop
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      } else {
+                        // If we can't pop, go to home
+                        Navigator.pushReplacementNamed(context, '/home');
+                      }
+                    },
+                  )
+                : null,
+        automaticallyImplyLeading: showDrawer || showBackButton,
       ),
       body: body,
     );

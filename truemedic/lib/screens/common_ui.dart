@@ -23,18 +23,12 @@ class _TopClippedDesignState extends State<TopClippedDesign>
   late Animation<Offset> _gradientSlideAnimation;
   late Animation<double> _textFadeAnimation;
   late Animation<double> _logoScaleAnimation;
+  bool _hasAnimated = false; // ✅ ADD: Track animation state
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _controller.reset();
-    _controller.forward();
   }
 
   @override
@@ -68,7 +62,10 @@ class _TopClippedDesignState extends State<TopClippedDesign>
       ),
     );
 
-    _controller.forward();
+    // ✅ FIX: Start animation immediately
+    _controller.forward().then((_) {
+      _hasAnimated = true;
+    });
   }
 
   @override

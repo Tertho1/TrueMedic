@@ -26,18 +26,18 @@ class _SplashScreenState extends State<SplashScreen> {
     
     if (!mounted) return;
     
-    // ✅ FIX: If we have a session, go to HOME instead of dashboard
-    if (session != null) {
-      print("✅ User is logged in: ${session.user.id}");
+    // ✅ FIX: Check if this is app startup or navigation
+    final isAppStartup = ModalRoute.of(context)?.settings.name == '/splash';
+    
+    if (session != null && isAppStartup) {
+      print("✅ User is logged in on app startup: ${session.user.id}");
       
-      // ✅ CHANGE: Always go to home screen when session exists
+      // Only redirect to home on actual app startup, not when navigating back
       Navigator.of(context).pushReplacementNamed('/home');
       return;
-    } else {
-      print("❌ No active session found");
     }
     
-    // No session found, go to welcome screen
+    // No session or not app startup - go to welcome screen
     Navigator.of(context).pushReplacementNamed('/');
   }
 

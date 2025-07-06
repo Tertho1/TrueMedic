@@ -127,265 +127,270 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // ✅ ADD HAMBURGER DRAWER
-      drawer: AppDrawer(),
-      appBar: AppBar(
-        title: const Text('My Profile'),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
-        // ✅ The hamburger menu is automatically added by Flutter when drawer is present
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () async {
-                await _loadUserProfile();
-                await _loadReviewCount();
-              },
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(), // For pull-to-refresh
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // User Info Card
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 30,
-                                  backgroundColor: Colors.teal,
-                                  child: Text(
-                                    _userProfile?['full_name']
-                                            ?.substring(0, 1)
-                                            .toUpperCase() ??
-                                        'U',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _userProfile?['full_name'] ?? 'User',
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Text(
-                                        _userProfile?['email'] ?? '',
-                                        style: TextStyle(
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                      // ✅ ADD REVIEW COUNT DISPLAY
-                                      if (_reviewCount > 0)
-                                        Container(
-                                          margin: const EdgeInsets.only(top: 8),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, 
-                                            vertical: 4
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.teal.shade100,
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Text(
-                                            '$_reviewCount Reviews Written',
-                                            style: TextStyle(
-                                              color: Colors.teal.shade700,
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+    return WillPopScope(
+      onWillPop: () async {
+        // ✅ FIX: Go to home screen when back button is pressed
+        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+        return false; // Prevent default back action
+      },
+      child: Scaffold(
+        drawer: AppDrawer(),
+        appBar: AppBar(
+          title: const Text('My Dashboard'), // Adjust title per screen
+          backgroundColor: Colors.teal,
+          foregroundColor: Colors.white,
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: () async {
+                  await _loadUserProfile();
+                  await _loadReviewCount();
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // User Info Card
+                      Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Reviews Section
-                    const Text(
-                      'My Reviews',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          ListTile(
-                            leading: const Icon(
-                              Icons.rate_review,
-                              color: Colors.blue,
-                            ),
-                            title: const Text('My Reviews'),
-                            subtitle: Text(
-                              _reviewCount > 0
-                                  ? 'You have written $_reviewCount reviews'
-                                  : 'You haven\'t written any reviews yet',
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_reviewCount > 0)
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.blue,
-                                      shape: BoxShape.circle,
-                                    ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 30,
+                                    backgroundColor: Colors.teal,
                                     child: Text(
-                                      '$_reviewCount',
+                                      _userProfile?['full_name']
+                                              ?.substring(0, 1)
+                                              .toUpperCase() ??
+                                          'U',
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 12,
+                                        fontSize: 24,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
-                                const SizedBox(width: 8),
-                                const Icon(Icons.arrow_forward_ios),
-                              ],
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const UserReviewsScreen(),
-                                ),
-                              ).then((_) {
-                                // Refresh count when returning
-                                _loadReviewCount();
-                              });
-                            },
-                          ),
-                          const Divider(),
-                          ListTile(
-                            leading: const Icon(
-                              Icons.search,
-                              color: Colors.green,
-                            ),
-                            title: const Text('Find Doctors to Review'),
-                            subtitle: const Text(
-                              'Search for doctors and write reviews',
-                            ),
-                            trailing: const Icon(Icons.arrow_forward_ios),
-                            onTap: () {
-                              // ✅ FIX: Navigate to home screen instead of '/'
-                              Navigator.pushNamed(context, '/home');
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Quick Actions
-                    const Text(
-                      'Quick Actions',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          ListTile(
-                            leading: const Icon(
-                              Icons.report_problem,
-                              color: Colors.red,
-                            ),
-                            title: const Text('Report Fake Doctor'),
-                            subtitle: const Text(
-                              'Help protect others from fraud',
-                            ),
-                            trailing: const Icon(Icons.arrow_forward_ios),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const ReportDoctorScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          const Divider(),
-                          ListTile(
-                            leading: const Icon(
-                              Icons.info_outline,
-                              color: Colors.blue,
-                            ),
-                            title: const Text('About TrueMedic'),
-                            subtitle: const Text(
-                              'Learn more about our platform',
-                            ),
-                            trailing: const Icon(Icons.arrow_forward_ios),
-                            onTap: () {
-                              showAboutDialog(
-                                context: context,
-                                applicationName: 'TrueMedic',
-                                applicationVersion: '1.0.0',
-                                applicationIcon: Image.asset(
-                                  'assets/logo.jpeg',
-                                  width: 50,
-                                  height: 50,
-                                ),
-                                children: const [
-                                  Text(
-                                    'TrueMedic helps verify doctor credentials and connect patients with healthcare professionals.',
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _userProfile?['full_name'] ?? 'User',
+                                          style: const TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          _userProfile?['email'] ?? '',
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                        // ✅ ADD REVIEW COUNT DISPLAY
+                                        if (_reviewCount > 0)
+                                          Container(
+                                            margin: const EdgeInsets.only(top: 8),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, 
+                                              vertical: 4
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.teal.shade100,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              '$_reviewCount Reviews Written',
+                                              style: TextStyle(
+                                                color: Colors.teal.shade700,
+                                                fontWeight: FontWeight.w500,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 ],
-                              );
-                            },
+                              ),
+                            ],
                           ),
-                          // ✅ REMOVE STANDALONE LOGOUT - IT'S NOW IN THE DRAWER
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+
+                      const SizedBox(height: 24),
+
+                      // Reviews Section
+                      const Text(
+                        'My Reviews',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: const Icon(
+                                Icons.rate_review,
+                                color: Colors.blue,
+                              ),
+                              title: const Text('My Reviews'),
+                              subtitle: Text(
+                                _reviewCount > 0
+                                    ? 'You have written $_reviewCount reviews'
+                                    : 'You haven\'t written any reviews yet',
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_reviewCount > 0)
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.blue,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        '$_reviewCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.arrow_forward_ios),
+                                ],
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const UserReviewsScreen(),
+                                  ),
+                                ).then((_) {
+                                  // Refresh count when returning
+                                  _loadReviewCount();
+                                });
+                              },
+                            ),
+                            const Divider(),
+                            ListTile(
+                              leading: const Icon(
+                                Icons.search,
+                                color: Colors.green,
+                              ),
+                              title: const Text('Find Doctors to Review'),
+                              subtitle: const Text(
+                                'Search for doctors and write reviews',
+                              ),
+                              trailing: const Icon(Icons.arrow_forward_ios),
+                              onTap: () {
+                                // ✅ FIX: Navigate to home screen instead of '/'
+                                Navigator.pushNamed(context, '/home');
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Quick Actions
+                      const Text(
+                        'Quick Actions',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: const Icon(
+                                Icons.report_problem,
+                                color: Colors.red,
+                              ),
+                              title: const Text('Report Fake Doctor'),
+                              subtitle: const Text(
+                                'Help protect others from fraud',
+                              ),
+                              trailing: const Icon(Icons.arrow_forward_ios),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ReportDoctorScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            const Divider(),
+                            ListTile(
+                              leading: const Icon(
+                                Icons.info_outline,
+                                color: Colors.blue,
+                              ),
+                              title: const Text('About TrueMedic'),
+                              subtitle: const Text(
+                                'Learn more about our platform',
+                              ),
+                              trailing: const Icon(Icons.arrow_forward_ios),
+                              onTap: () {
+                                showAboutDialog(
+                                  context: context,
+                                  applicationName: 'TrueMedic',
+                                  applicationVersion: '1.0.0',
+                                  applicationIcon: Image.asset(
+                                    'assets/logo.jpeg',
+                                    width: 50,
+                                    height: 50,
+                                  ),
+                                  children: const [
+                                    Text(
+                                      'TrueMedic helps verify doctor credentials and connect patients with healthcare professionals.',
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                            // ✅ REMOVE STANDALONE LOGOUT - IT'S NOW IN THE DRAWER
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 }

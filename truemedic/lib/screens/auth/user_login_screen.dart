@@ -18,6 +18,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _hasAnimated = false; // ✅ ADD: Track if animation has run
 
   // Controllers
   final _emailController = TextEditingController();
@@ -31,11 +32,17 @@ class _UserLoginScreenState extends State<UserLoginScreen>
     _initializeAnimations();
   }
 
+  // ✅ REMOVE OR MODIFY: Don't restart animation on dependency changes
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _controller.reset();
-    _controller.forward();
+    // ✅ FIX: Only animate on first load
+    if (!_hasAnimated) {
+      _controller.reset();
+      _controller.forward().then((_) {
+        _hasAnimated = true;
+      });
+    }
   }
 
   @override
@@ -69,67 +76,86 @@ class _UserLoginScreenState extends State<UserLoginScreen>
       ),
     );
 
-    _controller.forward();
+    // ✅ FIX: Start animation immediately and mark as animated
+    _controller.forward().then((_) {
+      _hasAnimated = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          TopClippedDesign(
-            gradient: LinearGradient(
-              colors: [Colors.blue.shade900, Colors.blue.shade700],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+      resizeToAvoidBottomInset: true, // ✅ Handle keyboard
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight:
+                  MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top -
+                  MediaQuery.of(context).padding.bottom,
             ),
-            showBackButton: true,
-            logoAsset: "assets/logo.jpeg",
-          ),
-          SlideTransition(
-            position: _formSlideAnimation,
-            child: Padding(
-              padding: const EdgeInsets.only(
-                top: 300,
-                left: 20,
-                right: 20,
-                bottom: 100,
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 10),
-                    FadeTransition(
-                      opacity: _titleFadeAnimation,
-                      child: Text(
-                        'User Login',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade800,
-                        ),
+            child: Stack(
+              children: [
+                TopClippedDesign(
+                  gradient: LinearGradient(
+                    colors: [Colors.blue.shade900, Colors.blue.shade700],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  showBackButton: true,
+                  logoAsset: "assets/logo.jpeg",
+                ),
+                SlideTransition(
+                  position: _formSlideAnimation,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: 300,
+                      left: 20,
+                      right: 20,
+                      bottom:
+                          MediaQuery.of(context).viewInsets.bottom +
+                          20, // ✅ Keyboard space
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 10),
+                          FadeTransition(
+                            opacity: _titleFadeAnimation,
+                            child: Text(
+                              'User Login',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          _buildEmailField(),
+                          const SizedBox(height: 20),
+                          _buildPasswordField(),
+                          const SizedBox(height: 20),
+                          _buildLoginButton(),
+                          const SizedBox(height: 10),
+                          _buildForgotPasswordButton(),
+                          const SizedBox(height: 10),
+                          _buildSignUpButton(),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    _buildEmailField(),
-                    const SizedBox(height: 20),
-                    _buildPasswordField(),
-                    const SizedBox(height: 20),
-                    _buildLoginButton(),
-                    const SizedBox(height: 10),
-                    _buildForgotPasswordButton(),
-                    const SizedBox(height: 10),
-                    _buildSignUpButton(),
-                  ],
+                  ),
                 ),
-              ),
+                if (_isLoading) const LoadingIndicator(),
+              ],
             ),
           ),
-          if (_isLoading) const LoadingIndicator(),
-        ],
+        ),
       ),
     );
   }
@@ -216,7 +242,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
         final userData =
             await supabase
                 .from('users')
-                .select()
+                .select('id, role')
                 .eq('id', response.user!.id)
                 .maybeSingle();
 
@@ -224,36 +250,56 @@ class _UserLoginScreenState extends State<UserLoginScreen>
           // Check the user's role
           final role = userData['role'] as String?;
 
+          print('✅ User logged in with role: $role');
+
           if (role == 'admin') {
             Navigator.of(
               context,
             ).pushNamedAndRemoveUntil('/admin-dashboard', (route) => false);
-          } else if (role == 'doctor') {
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              '/doctor-dashboard', // You might want to add this route
-              (route) => false,
-            );
-          } else {
-            // Regular user
+          } else if (role == 'doctor' || role == 'doctor_unverified') {
             Navigator.of(
               context,
-            ).pushNamedAndRemoveUntil('/home', (route) => false);
+            ).pushNamedAndRemoveUntil('/doctor-dashboard', (route) => false);
+          } else {
+            // ✅ FIX: Regular user goes to user dashboard, not home
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/user-dashboard', (route) => false);
           }
         } else {
-          // No user profile found
-          await supabase.auth.signOut();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No user profile found for this account'),
-            ),
-          );
+          // Check if user exists in doctors table
+          final doctorData =
+              await supabase
+                  .from('doctors')
+                  .select('id')
+                  .eq('id', response.user!.id)
+                  .maybeSingle();
+
+          if (doctorData != null) {
+            print('✅ Doctor logged in');
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/doctor-dashboard', (route) => false);
+          } else {
+            // No profile found, sign out and show error
+            await supabase.auth.signOut();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No user profile found for this account'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Login error: ${e.toString()}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Login error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

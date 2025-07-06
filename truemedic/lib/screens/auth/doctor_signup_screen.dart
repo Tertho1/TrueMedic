@@ -22,6 +22,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   bool _obscurePassword = true;
   late AnimationController _controller;
   late Animation<Offset> _formSlideAnimation;
+  bool _hasAnimated = false; // ✅ ADD: Track animation state
   String? _sessionId;
   String? _captchaImageBase64;
   bool _isCaptchaLoading = false;
@@ -75,7 +76,10 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
       ),
     );
 
-    _controller.forward();
+    // ✅ FIX: Start animation immediately
+    _controller.forward().then((_) {
+      _hasAnimated = true;
+    });
   }
 
   @override

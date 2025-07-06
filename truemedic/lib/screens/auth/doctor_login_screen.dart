@@ -14,6 +14,7 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
   late AnimationController _controller;
   late Animation<Offset> _formSlideAnimation;
   late Animation<double> _titleFadeAnimation;
+  bool _hasAnimated = false; // ✅ ADD: Track animation state
 
   final supabase = Supabase.instance.client;
   final _emailController = TextEditingController();
@@ -26,21 +27,6 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _controller.reset();
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
   }
 
   void _initializeAnimations() {
@@ -66,7 +52,18 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
       ),
     );
 
-    _controller.forward();
+    // ✅ FIX: Start animation immediately
+    _controller.forward().then((_) {
+      _hasAnimated = true;
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override

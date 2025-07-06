@@ -8,7 +8,7 @@ import 'package:supabase/supabase.dart';
 import 'search_screen.dart';
 import '../common_ui.dart';
 import '../loading_indicator.dart';
-import '../../widgets/base_scaffold.dart';
+import '../../widgets/app_drawer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen>
   final TextEditingController _searchController = TextEditingController();
   late AnimationController _controller;
   late Animation<Offset> _contentSlideAnimation;
+  bool _hasAnimated = false; // ✅ ADD: Track animation state
   int _regStudentType = 1;
   int _searchType = 0;
   String? _sessionId;
@@ -57,7 +58,10 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
 
-    _controller.forward();
+    // ✅ FIX: Start animation immediately
+    _controller.forward().then((_) {
+      _hasAnimated = true;
+    });
   }
 
   @override
@@ -676,263 +680,103 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: 'TrueMedic',
-      // ✅ ADD: Show user status in app bar actions
-      actions: [
-        // Show login status and user actions
-        _buildUserActions(),
-      ],
-      body: SizedBox.expand(
-        child: Stack(
-          children: [
-            TopClippedDesign(
-              gradient: LinearGradient(
-                colors: [Colors.teal.shade800, Colors.tealAccent.shade700],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+    return WillPopScope(
+      onWillPop: () async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Exit App'),
+            content: const Text('Do you want to exit the app?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('No'),
               ),
-              showBackButton: true,
-              logoAsset: "assets/logo.jpeg",
-            ),
-            SlideTransition(
-              position: _contentSlideAnimation,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 300, bottom: 60),
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      // ✅ ADD: Welcome message for logged-in users
-                      _buildWelcomeMessage(),
-                      _buildSearchTypeSelector(),
-                      _buildStudentTypeSelector(),
-                      _buildSearchField(),
-                    ],
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context, true);
+                  SystemNavigator.pop(); // ✅ Actually exit the app
+                },
+                child: const Text('Yes'),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
+      child: Scaffold(
+        // ✅ FIX: Add keyboard handling
+        resizeToAvoidBottomInset: true,
+        drawer: AppDrawer(),
+        appBar: AppBar(
+          title: Text('TrueMedic'),
+          backgroundColor: Colors.teal.shade600,
+          foregroundColor: Colors.white,
+        ),
+        body: SafeArea(
+          child: SizedBox.expand(
+            child: Stack(
+              children: [
+                TopClippedDesign(
+                  gradient: LinearGradient(
+                    colors: [Colors.teal.shade800, Colors.tealAccent.shade700],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
+                  showBackButton: true,
+                  logoAsset: "assets/logo.jpeg",
                 ),
-              ),
-            ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                height: 60,
-                color: Colors.teal.shade800.withOpacity(0.9),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Center(
-                  child: Text(
-                    '© ${DateTime.now().year} TrueMedic. All rights reserved.',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                // ✅ FIX: Wrap content in keyboard-aware container
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 60, // Leave space for copyright
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: MediaQuery.of(context).size.height - 160,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 300),
+                        child: Column(
+                          children: [
+                            _buildSearchTypeSelector(),
+                            _buildStudentTypeSelector(),
+                            _buildSearchField(),
+                          ],
+                        ),
+                      ),
                     ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
-              ),
+                // Copyright stays at bottom
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 60,
+                    color: Colors.teal.shade800.withOpacity(0.9),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Center(
+                      child: Text(
+                        '© ${DateTime.now().year} TrueMedic. All rights reserved.',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
-
-  // ✅ NEW: User actions for app bar
-  Widget _buildUserActions() {
-    final isLoggedIn = supabaseClient.auth.currentSession != null;
-    
-    if (isLoggedIn) {
-      return PopupMenuButton<String>(
-        icon: const Icon(Icons.account_circle, color: Colors.white),
-        onSelected: (value) {
-          switch (value) {
-            case 'dashboard':
-              _navigateToUserDashboard();
-              break;
-            case 'logout':
-              _handleLogout();
-              break;
-          }
-        },
-        itemBuilder: (context) => [
-          const PopupMenuItem(
-            value: 'dashboard',
-            child: Row(
-              children: [
-                Icon(Icons.dashboard),
-                SizedBox(width: 8),
-                Text('My Dashboard'),
-              ],
-            ),
-          ),
-          const PopupMenuItem(
-            value: 'logout',
-            child: Row(
-              children: [
-                Icon(Icons.logout),
-                SizedBox(width: 8),
-                Text('Logout'),
-              ],
-            ),
-          ),
-        ],
-      );
-    } else {
-      return TextButton(
-        onPressed: () => Navigator.pushNamed(context, '/user-or-doctor'),
-        child: const Text(
-          'Login',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      );
-    }
-  }
-
-  // ✅ NEW: Welcome message for logged-in users
-  Widget _buildWelcomeMessage() {
-    final user = supabaseClient.auth.currentUser;
-    
-    if (user == null) return const SizedBox.shrink();
-    
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.teal.shade100,
-              borderRadius: BorderRadius.circular(50),
-            ),
-            child: Icon(
-              Icons.person,
-              color: Colors.teal.shade700,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome back!',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.teal.shade700,
-                  ),
-                ),
-                Text(
-                  user.email ?? 'User',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: _navigateToUserDashboard,
-            child: Text(
-              'Dashboard',
-              style: GoogleFonts.poppins(
-                color: Colors.teal.shade700,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ NEW: Smart navigation to user dashboard
-  void _navigateToUserDashboard() async {
-    try {
-      final userId = supabaseClient.auth.currentUser?.id;
-      if (userId == null) return;
-
-      // Check user type to redirect to correct dashboard
-      final userData = await supabaseClient
-          .from('users')
-          .select('role')
-          .eq('id', userId)
-          .maybeSingle();
-
-      if (userData != null) {
-        // Check if admin role
-        if (userData['role'] == 'admin') {
-          Navigator.pushNamed(context, '/admin-dashboard');
-          return;
-        } else if (userData['role'] == 'user') {
-          Navigator.pushNamed(context, '/user-dashboard');
-          return;
-        } else if (userData['role'] == 'doctor' || userData['role'] == 'doctor_unverified') {
-          Navigator.pushNamed(context, '/doctor-dashboard');
-          return;
-        }
-      }
-
-      // Check if doctor
-      final doctorData = await supabaseClient
-          .from('doctors')
-          .select('id')
-          .eq('id', userId)
-          .maybeSingle();
-
-      if (doctorData != null) {
-        Navigator.pushNamed(context, '/doctor-dashboard');
-        return;
-      }
-
-      // Default to user dashboard
-      Navigator.pushNamed(context, '/user-dashboard');
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
-    }
-  }
-
-  // ✅ NEW: Handle logout from home screen
-  void _handleLogout() async {
-    try {
-      await supabaseClient.auth.signOut();
-      
-      if (mounted) {
-        setState(() {}); // Refresh UI to show login button
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Logged out successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Logout error: ${e.toString()}')),
-        );
-      }
-    }
-  }
-
-  // ... rest of your existing methods remain the same ...
 }

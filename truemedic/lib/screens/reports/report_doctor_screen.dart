@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/report_service.dart';
 import '../../models/report_category.dart';
-import '../../models/fake_doctor_report.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ReportDoctorScreen extends StatefulWidget {

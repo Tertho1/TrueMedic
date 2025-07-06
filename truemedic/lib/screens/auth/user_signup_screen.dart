@@ -17,6 +17,7 @@ class _UserSignupScreenState extends State<UserSignupScreen>
   bool _isLoading = false;
   late AnimationController _controller;
   late Animation<Offset> _formSlideAnimation;
+  bool _hasAnimated = false; // ✅ ADD: Track animation state
 
   // Controllers
   final _fullNameController = TextEditingController();
@@ -50,7 +51,10 @@ class _UserSignupScreenState extends State<UserSignupScreen>
       ),
     );
 
-    _controller.forward();
+    // ✅ FIX: Start animation immediately
+    _controller.forward().then((_) {
+      _hasAnimated = true;
+    });
   }
 
   @override
