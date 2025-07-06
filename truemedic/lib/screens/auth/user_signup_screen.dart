@@ -79,7 +79,6 @@ class _UserSignupScreenState extends State<UserSignupScreen>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
-            showBackButton: true,
             logoAsset: "assets/logo.jpeg",
           ),
           Padding(

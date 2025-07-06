@@ -461,7 +461,6 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
-            showBackButton: true,
             logoAsset: "assets/logo.jpeg",
           ),
           Padding(

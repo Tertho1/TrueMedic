@@ -111,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen>
     print('🔍 Input BMDC Number: "$bmdcNumber"');
     print('🔍 Selected Student Type: $_regStudentType (1=MBBS, 2=BDS)');
     print('🔍 BMDC Length: ${bmdcNumber.length}');
-    
+
     if (!RegExp(r'^\d+$').hasMatch(bmdcNumber)) {
       print('❌ BMDC validation failed: Contains non-digits');
       _showErrorSnackbar('Only numbers are allowed for BMDC');
@@ -120,20 +120,26 @@ class _HomeScreenState extends State<HomeScreen>
 
     // ✅ UPDATED: Fix BDS validation logic with debug
     if (_regStudentType == 1 && bmdcNumber.length != 6) {
-      print('❌ MBBS validation failed: Length is ${bmdcNumber.length}, expected 6');
+      print(
+        '❌ MBBS validation failed: Length is ${bmdcNumber.length}, expected 6',
+      );
       _showErrorSnackbar('MBBS registration must be 6 digits');
       return;
     }
-    
+
     // ✅ FIX: Correct BDS validation (5 digits or less, minimum 4)
     if (_regStudentType == 2) {
       if (bmdcNumber.length > 5) {
-        print('❌ BDS validation failed: Length is ${bmdcNumber.length}, must be 5 or less');
+        print(
+          '❌ BDS validation failed: Length is ${bmdcNumber.length}, must be 5 or less',
+        );
         _showErrorSnackbar('BDS registration must be 5 digits or less');
         return;
       }
       if (bmdcNumber.length < 4) {
-        print('❌ BDS validation failed: Length is ${bmdcNumber.length}, must be at least 4');
+        print(
+          '❌ BDS validation failed: Length is ${bmdcNumber.length}, must be at least 4',
+        );
         _showErrorSnackbar('BDS registration must be at least 4 digits');
         return;
       }
@@ -145,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen>
     try {
       print('🔄 Initializing session...');
       await _initializeSession();
-      
+
       setState(() => _isSearchLoading = false);
 
       if (_captchaImageBase64 != null) {
@@ -187,10 +193,10 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<List<Doctor>> _searchLocalDatabase(String name) async {
     print('🔍 =================== LOCAL SEARCH DEBUG ===================');
-    
+
     // ✅ FIX: Use the currently selected student type
     final table = _regStudentType == 1 ? 'mbbs_doctors' : 'bds_doctors';
-    
+
     print('🔍 Search Name: "$name"');
     print('🔍 Student Type: $_regStudentType');
     print('🔍 Search Table: $table');
@@ -202,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen>
           .ilike('full_name', '%$name%');
 
       print('🔍 Query Response Type: ${response.runtimeType}');
-      
+
       if (response is PostgrestException) {
         print('❌ PostgrestException: $response');
         throw Exception('Failed to fetch data from Supabase');
@@ -210,14 +216,14 @@ class _HomeScreenState extends State<HomeScreen>
 
       final data = response as List;
       print('🔍 Found ${data.length} doctors in $table');
-      
+
       if (data.isNotEmpty) {
         print('🔍 First doctor sample: ${json.encode(data.first)}');
       }
-      
+
       final doctors = data.map((doc) => Doctor.fromJson(doc)).toList();
       print('✅ Successfully parsed ${doctors.length} doctors');
-      
+
       return doctors;
     } catch (e) {
       print('❌ Error searching database: $e');
@@ -439,14 +445,14 @@ class _HomeScreenState extends State<HomeScreen>
     print('🔍 Registration Number: "${_searchController.text}"');
     print('🔍 CAPTCHA Text: "$captchaText"');
     print('🔍 Student Type: $_regStudentType (1=MBBS, 2=BDS)');
-    
+
     final requestBody = {
       'session_id': _sessionId,
       'registration_number': _searchController.text,
       'captcha_text': captchaText,
       'reg_student': _regStudentType,
     };
-    
+
     print('🔍 Request Body: ${json.encode(requestBody)}');
 
     showDialog(
@@ -457,7 +463,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     try {
       print('🔄 Making API call to verify-doctor...');
-      
+
       final response = await http.post(
         Uri.parse('https://tm-api-zeta.vercel.app/verify-doctor'),
         headers: {'Content-Type': 'application/json'},
@@ -477,14 +483,14 @@ class _HomeScreenState extends State<HomeScreen>
           final data = json.decode(response.body);
           print('✅ JSON parsing successful');
           print('🔍 Parsed Data Keys: ${data.keys.toList()}');
-          
+
           // ✅ ADD: Check if the response contains an error
           if (data['error'] != null) {
             print('❌ API returned error: ${data['error']}');
             _showErrorSnackbar('API Error: ${data['error']}');
             return;
           }
-          
+
           // ✅ ADD: Check if doctor data is valid
           if (data['name'] == null || data['registration_number'] == null) {
             print('❌ Invalid doctor data received');
@@ -493,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen>
             _showErrorSnackbar('No doctor found with this registration number');
             return;
           }
-          
+
           print('✅ Creating Doctor object...');
           final doctor = Doctor.fromJson(data);
           print('✅ Doctor object created: ${doctor.fullName}');
@@ -506,7 +512,9 @@ class _HomeScreenState extends State<HomeScreen>
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => SearchResultScreen(doctor: doctor, isFromLocal: false),
+              builder:
+                  (context) =>
+                      SearchResultScreen(doctor: doctor, isFromLocal: false),
             ),
           );
         } catch (jsonError) {
@@ -515,16 +523,21 @@ class _HomeScreenState extends State<HomeScreen>
         }
       } else {
         print('❌ API call failed with status: ${response.statusCode}');
-        
+
         // ✅ IMPROVED: Better error handling for different status codes
         try {
           final errorData = json.decode(response.body);
-          final errorMessage = errorData['error'] ?? errorData['message'] ?? 'Failed to fetch doctor details';
+          final errorMessage =
+              errorData['error'] ??
+              errorData['message'] ??
+              'Failed to fetch doctor details';
           print('🔍 Error message from API: $errorMessage');
           _showErrorSnackbar('Search failed: $errorMessage');
         } catch (e) {
           print('❌ Could not parse error response: $e');
-          _showErrorSnackbar('Failed to fetch doctor details (${response.statusCode})');
+          _showErrorSnackbar(
+            'Failed to fetch doctor details (${response.statusCode})',
+          );
         }
       }
     } catch (e) {
@@ -533,22 +546,23 @@ class _HomeScreenState extends State<HomeScreen>
       print('❌ Error type: ${e.runtimeType}');
       _showErrorSnackbar('Network error: ${e.toString()}');
     }
-    
+
     print('🔍 =================== END API DEBUG ===================');
   }
 
   Future<void> _storeDoctorLocally(Doctor doctor) async {
     print('🔍 =================== LOCAL STORAGE DEBUG ===================');
-    
+
     // ✅ FIX: Determine table based on BMDC length, not current selection
-    final bmdcLength = doctor.bmdcNumber.replaceAll(RegExp(r'[^0-9]'), '').length;
+    final bmdcLength =
+        doctor.bmdcNumber.replaceAll(RegExp(r'[^0-9]'), '').length;
     final table = bmdcLength == 6 ? 'mbbs_doctors' : 'bds_doctors';
-    
+
     print('🔍 BMDC Number: "${doctor.bmdcNumber}"');
     print('🔍 BMDC Length (digits only): $bmdcLength');
     print('🔍 Selected Table: $table');
     print('🔍 Current Student Type Selection: $_regStudentType');
-    
+
     final doctorData = {
       'bmdc_number': doctor.bmdcNumber,
       'full_name': doctor.fullName,
@@ -563,9 +577,9 @@ class _HomeScreenState extends State<HomeScreen>
       'dob': doctor.dob,
       'image_base64': doctor.doctorImageBase64,
     };
-    
+
     print('🔍 Data to store: ${json.encode(doctorData)}');
-    
+
     try {
       await supabaseClient.from(table).upsert(doctorData);
       print('✅ Doctor stored successfully in $table table');
@@ -834,7 +848,7 @@ class _HomeScreenState extends State<HomeScreen>
         resizeToAvoidBottomInset: true,
         drawer: AppDrawer(),
         appBar: AppBar(
-          title: Text('TrueMedic'),
+          title: Text('TrueMedic - Home'),
           backgroundColor: Colors.teal.shade600,
           foregroundColor: Colors.white,
         ),
@@ -848,8 +862,6 @@ class _HomeScreenState extends State<HomeScreen>
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
-                  showBackButton: true,
-                  logoAsset: "assets/logo.jpeg",
                 ),
                 // ✅ FIX: Wrap content in keyboard-aware container
                 Positioned(

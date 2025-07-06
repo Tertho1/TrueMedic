@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../common_ui.dart';
 
-
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userProfile;
-  
+
   const EditProfileScreen({super.key, required this.userProfile});
-  
+
   @override
   _EditProfileScreenState createState() => _EditProfileScreenState();
 }
@@ -15,42 +14,49 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final supabase = Supabase.instance.client;
-  
+
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   bool _isLoading = false;
-  
+
   @override
   void initState() {
     super.initState();
     // Initialize controllers with existing user data
-    _nameController = TextEditingController(text: widget.userProfile['full_name'] ?? '');
-    _phoneController = TextEditingController(text: widget.userProfile['phone_number'] ?? '');
+    _nameController = TextEditingController(
+      text: widget.userProfile['full_name'] ?? '',
+    );
+    _phoneController = TextEditingController(
+      text: widget.userProfile['phone_number'] ?? '',
+    );
   }
-  
+
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
-      
+
       // Remove the updated_at field since it doesn't exist in your database
-      await supabase.from('users').update({
-        'full_name': _nameController.text.trim(),
-        'phone_number': _phoneController.text.trim(),
-        // 'updated_at': DateTime.now().toIso8601String(), // Remove this line
-      }).eq('id', userId);
-      
+      await supabase
+          .from('users')
+          .update({
+            'full_name': _nameController.text.trim(),
+            'phone_number': _phoneController.text.trim(),
+            // 'updated_at': DateTime.now().toIso8601String(), // Remove this line
+          })
+          .eq('id', userId);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile updated successfully')),
@@ -60,43 +66,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } on PostgrestException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Database error: ${e.message}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Database error: ${e.message}')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Profile'),
-      ),
+      appBar: AppBar(title: const Text('Edit Profile')),
       body: Stack(
         children: [
-          const TopClippedDesign(
+          TopClippedDesign(
             gradient: LinearGradient(
-              colors: [Colors.blueAccent, Colors.lightBlueAccent],
+              colors: [Colors.teal.shade800, Colors.tealAccent.shade700],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
-            showBackButton: false,
           ),
           Padding(
-            padding: const EdgeInsets.only(
-              top: 280,
-              left: 20,
-              right: 20,
-            ),
+            padding: const EdgeInsets.only(top: 280, left: 20, right: 20),
             child: Card(
               elevation: 8,
               shape: RoundedRectangleBorder(
@@ -112,7 +111,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         CircleAvatar(
                           radius: 50,
                           backgroundColor: Colors.blue.shade100,
-                          child: const Icon(Icons.person, size: 40, color: Colors.blue),
+                          child: const Icon(
+                            Icons.person,
+                            size: 40,
+                            color: Colors.blue,
+                          ),
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
@@ -147,16 +150,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               backgroundColor: Colors.blue,
                               foregroundColor: Colors.white,
                             ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2.0,
-                                    ),
-                                  )
-                                : const Text('Save Changes'),
+                            child:
+                                _isLoading
+                                    ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2.0,
+                                      ),
+                                    )
+                                    : const Text('Save Changes'),
                           ),
                         ),
                       ],

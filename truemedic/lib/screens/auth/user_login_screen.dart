@@ -105,7 +105,6 @@ class _UserLoginScreenState extends State<UserLoginScreen>
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
-                  showBackButton: true,
                   logoAsset: "assets/logo.jpeg",
                 ),
                 SlideTransition(

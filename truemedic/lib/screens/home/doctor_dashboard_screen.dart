@@ -1243,7 +1243,8 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                               color: Colors.teal.shade700,
                               size: 20,
                             ),
-                            onPressed: _showProfessionalDetailsModal, // Changed from _navigateToAppointmentDetails
+                            onPressed:
+                                _showProfessionalDetailsModal, // Changed from _navigateToAppointmentDetails
                             tooltip: 'Edit Professional Details',
                           ),
                         ],
@@ -1477,25 +1478,25 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   }
 
   Widget _buildAppointmentDetailsCard() {
-  if (_loadingAppointmentDetails) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: const Padding(
-        padding: EdgeInsets.all(40),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+    if (_loadingAppointmentDetails) {
+      return Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: const Padding(
+          padding: EdgeInsets.all(40),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    return _AppointmentDetailsCard(
+      appointmentDetails: _appointmentDetails,
+      appointmentLocations: _appointmentLocations,
+      buildDetailRow: _buildDetailRow,
+      onEditPressed: _navigateToAppointmentDetails,
+      formatTime12Hour: _formatTime12Hour, // Add this line
     );
   }
-
-  return _AppointmentDetailsCard(
-    appointmentDetails: _appointmentDetails,
-    appointmentLocations: _appointmentLocations,
-    buildDetailRow: _buildDetailRow,
-    onEditPressed: _navigateToAppointmentDetails,
-    formatTime12Hour: _formatTime12Hour, // Add this line
-  );
-}
 
   Widget _buildDetailRow(String label, String value, IconData icon) {
     return Padding(
@@ -1537,21 +1538,6 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   Widget build(BuildContext context) {
     return BaseScaffold(
       title: 'Doctor Dashboard',
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications),
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Notifications coming soon')),
-            );
-          },
-        ),
-        IconButton(
-          icon: const Icon(Icons.logout),
-          onPressed: _logout,
-          tooltip: 'Logout',
-        ),
-      ],
       body: RefreshIndicator(
         onRefresh: _initializeDashboard,
         child: Stack(
@@ -1562,7 +1548,6 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
-              showBackButton: false,
             ),
             Padding(
               padding: const EdgeInsets.only(top: 270, bottom: 20),
@@ -1916,178 +1901,202 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
   }
 
   Widget _buildLocationTile(Map<String, dynamic> location) {
-  final availableDays = (location['available_days'] as List<dynamic>?) ?? [];
+    final availableDays = (location['available_days'] as List<dynamic>?) ?? [];
 
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Location name and time in one row
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  location['location_name'] ?? 'Unknown Location',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.teal,
-                  ),
-                ),
-              ),
-              Text(
-                '${_formatTime12Hour(location['start_time'])} - ${_formatTime12Hour(location['end_time'])}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-
-          // Address
-          if (location['address'] != null &&
-              location['address'].toString().isNotEmpty) ...[
-            const SizedBox(height: 6),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Location name and time in one row
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.place, size: 14, color: Colors.grey.shade600),
-                const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    location['address'],
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    location['location_name'] ?? 'Unknown Location',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.teal,
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ],
-
-          const SizedBox(height: 6),
-
-          // Appointment duration and max appointments info
-          Row(
-            children: [
-              Icon(Icons.timer, size: 14, color: Colors.blue.shade600),
-              const SizedBox(width: 4),
-              Text(
-                '${location['appointment_duration']}min slots',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-              ),
-              const SizedBox(width: 12),
-              Icon(Icons.event, size: 14, color: Colors.blue.shade600),
-              const SizedBox(width: 4),
-              Text(
-                'Max ${location['max_appointments_per_day']}/day',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-              ),
-            ],
-          ),
-
-          // Available days - ADD THIS SECTION
-          if (availableDays.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.calendar_today, size: 14, color: Colors.green.shade600),
-                const SizedBox(width: 4),
                 Text(
-                  'Days: ',
+                  '${_formatTime12Hour(location['start_time'])} - ${_formatTime12Hour(location['end_time'])}',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
+                    color: Colors.black,
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                Expanded(
-                  child: Wrap(
-                    spacing: 4,
-                    runSpacing: 2,
-                    children: availableDays.take(4).map((day) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: Colors.teal.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.teal.shade300),
-                      ),
-                      child: Text(
-                        day.toString().length > 3 ? day.toString().substring(0, 3) : day.toString(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.teal.shade700,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    )).toList(),
                   ),
                 ),
               ],
             ),
-            // Show "+X more" if there are more than 4 days
-            if (availableDays.length > 4)
-              Padding(
-                padding: const EdgeInsets.only(top: 2, left: 18),
-                child: Text(
-                  '+${availableDays.length - 4} more days',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey.shade600,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ),
-          ] else
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Row(
+
+            // Address
+            if (location['address'] != null &&
+                location['address'].toString().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.calendar_today, size: 14, color: Colors.orange.shade600),
+                  Icon(Icons.place, size: 14, color: Colors.grey.shade600),
                   const SizedBox(width: 4),
-                  Text(
-                    'No days selected',
-                    style: TextStyle(
-                      color: Colors.orange.shade600,
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
+                  Expanded(
+                    child: Text(
+                      location['address'],
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
-            ),
+            ],
 
-          // Contact number if available
-          if (location['contact_number'] != null &&
-              location['contact_number'].toString().isNotEmpty) ...[
             const SizedBox(height: 6),
+
+            // Appointment duration and max appointments info
             Row(
               children: [
-                Icon(Icons.phone, size: 14, color: Colors.blue.shade600),
+                Icon(Icons.timer, size: 14, color: Colors.blue.shade600),
                 const SizedBox(width: 4),
                 Text(
-                  location['contact_number'],
+                  '${location['appointment_duration']}min slots',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                ),
+                const SizedBox(width: 12),
+                Icon(Icons.event, size: 14, color: Colors.blue.shade600),
+                const SizedBox(width: 4),
+                Text(
+                  'Max ${location['max_appointments_per_day']} appointments/day',
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                 ),
               ],
             ),
+
+            // Available days - ADD THIS SECTION
+            if (availableDays.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 14,
+                    color: Colors.green.shade600,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Days: ',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 4,
+                      runSpacing: 2,
+                      children:
+                          availableDays
+                              .take(4)
+                              .map(
+                                (day) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.teal.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.teal.shade300,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    day.toString().length > 3
+                                        ? day.toString().substring(0, 3)
+                                        : day.toString(),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.teal.shade700,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                    ),
+                  ),
+                ],
+              ),
+              // Show "+X more" if there are more than 4 days
+              if (availableDays.length > 4)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, left: 18),
+                  child: Text(
+                    '+${availableDays.length - 4} more days',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey.shade600,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today,
+                      size: 14,
+                      color: Colors.orange.shade600,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'No days selected',
+                      style: TextStyle(
+                        color: Colors.orange.shade600,
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Contact number if available
+            if (location['contact_number'] != null &&
+                location['contact_number'].toString().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(Icons.phone, size: 14, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    location['contact_number'],
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _showAllLocationsModal(BuildContext context) {
     showModalBottomSheet(
@@ -2096,73 +2105,74 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            expand: false,
+            builder: (context, scrollController) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'All Appointment Locations',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(5),
+                        ),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
+                    const SizedBox(height: 16),
+
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'All Appointment Locations',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      '${widget.appointmentLocations.length} locations configured',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+
+                    // All locations list
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: widget.appointmentLocations.length,
+                        itemBuilder: (context, index) {
+                          final location = widget.appointmentLocations[index];
+                          return _buildDetailedLocationTile(location);
+                        },
+                      ),
                     ),
                   ],
                 ),
-                Text(
-                  '${widget.appointmentLocations.length} locations configured',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14,
-                  ),
-                ),
-                const Divider(),
-                const SizedBox(height: 8),
-
-                // All locations list
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    itemCount: widget.appointmentLocations.length,
-                    itemBuilder: (context, index) {
-                      final location = widget.appointmentLocations[index];
-                      return _buildDetailedLocationTile(location);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
     );
   }
 
@@ -2262,29 +2272,30 @@ class _AppointmentDetailsCardState extends State<_AppointmentDetailsCard> {
             Wrap(
               spacing: 4,
               runSpacing: 2,
-              children: availableDays
-                  .map(
-                    (day) => Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.teal.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.teal.shade300),
-                      ),
-                      child: Text(
-                        day.toString(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.teal.shade700,
-                          fontWeight: FontWeight.w500,
+              children:
+                  availableDays
+                      .map(
+                        (day) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.teal.shade300),
+                          ),
+                          child: Text(
+                            day.toString(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.teal.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  )
-                  .toList(),
+                      )
+                      .toList(),
             ),
           ] else
             Text(

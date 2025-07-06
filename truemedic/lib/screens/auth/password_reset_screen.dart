@@ -37,7 +37,6 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
-            showBackButton: false,
             logoAsset: "assets/logo.jpeg",
           ),
           Padding(
@@ -153,15 +152,17 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Password updated successfully!')),
         );
-        
+
         // Navigate to login after successful password reset
-        Navigator.of(context).pushNamedAndRemoveUntil('/user-login', (route) => false);
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil('/user-login', (route) => false);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

@@ -63,7 +63,6 @@ class _UserOrDoctorScreenState extends State<UserOrDoctorScreen>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
-            showBackButton: true,
           ),
           Padding(
             padding: const EdgeInsets.only(top: 120),
@@ -96,7 +95,8 @@ class _UserOrDoctorScreenState extends State<UserOrDoctorScreen>
                       context,
                       icon: Icons.medical_services_outlined,
                       title: 'Doctor Login',
-                      onTap: () => Navigator.pushNamed(context, '/doctor-login'),
+                      onTap:
+                          () => Navigator.pushNamed(context, '/doctor-login'),
                     ),
                   ],
                 ),

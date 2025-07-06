@@ -8,7 +8,7 @@ class VerificationPendingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final supabase = Supabase.instance.client;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Verification Pending'),
@@ -30,7 +30,6 @@ class VerificationPendingScreen extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
-            showBackButton: false,
           ),
           Center(
             child: Padding(

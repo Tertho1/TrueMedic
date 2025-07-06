@@ -3,13 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 
 class TopClippedDesign extends StatefulWidget {
   final LinearGradient gradient;
-  final bool showBackButton;
   final String logoAsset;
 
   const TopClippedDesign({
     super.key,
     required this.gradient,
-    this.showBackButton = true,
     this.logoAsset = "assets/logo.jpeg",
   });
 
@@ -86,17 +84,8 @@ class _TopClippedDesignState extends State<TopClippedDesign>
                 child: Padding(
                   padding: const EdgeInsets.only(top: 20, left: 10, right: 10),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      if (widget.showBackButton)
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      if (!widget.showBackButton) const SizedBox(width: 40),
                       FadeTransition(
                         opacity: _textFadeAnimation,
                         child: Text(
@@ -115,7 +104,6 @@ class _TopClippedDesignState extends State<TopClippedDesign>
                           ),
                         ),
                       ),
-                      const SizedBox(width: 40),
                     ],
                   ),
                 ),

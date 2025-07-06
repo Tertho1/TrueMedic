@@ -78,7 +78,6 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
-            showBackButton: true,
             logoAsset: "assets/logo.jpeg",
           ),
           SlideTransition(

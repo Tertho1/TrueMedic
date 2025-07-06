@@ -13,6 +13,11 @@ class AppDrawer extends StatelessWidget {
     final isLoggedIn = supabase.auth.currentSession != null;
     final user = supabase.auth.currentUser;
 
+    // Check current route to determine app name
+    final currentRoute = ModalRoute.of(context)?.settings.name;
+    final isOnHomeScreen = currentRoute == '/home';
+    final appName = isOnHomeScreen ? 'TrueMedic-Home' : 'TrueMedic';
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -41,7 +46,7 @@ class AppDrawer extends StatelessWidget {
                       : Image.asset('assets/logo.jpeg', width: 60, height: 60),
             ),
             accountName: Text(
-              isLoggedIn ? 'Welcome Back!' : 'TrueMedic',
+              isLoggedIn ? 'Welcome Back!' : appName,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             accountEmail: Text(
