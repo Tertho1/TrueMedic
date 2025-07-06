@@ -1467,31 +1467,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                     const Divider(height: 30),
 
                     // Professional Information Section
-                    _buildModalSection(
-                      'Professional Information',
-                      Icons.medical_services,
-                      [
-                        if (_appointmentInfo!['designation'] != null)
-                          _buildModalDetailRow(
-                            'Designation',
-                            _appointmentInfo!['designation'],
-                          ),
-                        if (_appointmentInfo!['specialities'] != null)
-                          _buildModalDetailRow(
-                            'Specialities',
-                            _formatSpecialities(
-                              _appointmentInfo!['specialities'],
-                            ),
-                          ),
-                        if (_appointmentInfo!['experience'] != null)
-                          _buildModalDetailRow(
-                            'Experience',
-                            '${_appointmentInfo!['experience']} years',
-                          ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
+                    // 
 
                     // Appointment Locations Section
                     _buildModalSection(
