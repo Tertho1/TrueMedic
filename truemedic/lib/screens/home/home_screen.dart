@@ -21,6 +21,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode =
+      FocusNode(); // ✅ ADD: Focus node for search field
   late AnimationController _controller;
   late Animation<Offset> _contentSlideAnimation;
   bool _hasAnimated = false; // ✅ ADD: Track animation state
@@ -85,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     _controller.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose(); // ✅ ADD: Dispose focus node
     _authSubscription?.cancel(); // ✅ ADD: Cancel auth subscription
     super.dispose();
   }
@@ -642,6 +645,11 @@ class _HomeScreenState extends State<HomeScreen>
                     (value) => setState(() {
                       _searchType = value!;
                       _searchController.clear();
+                      // ✅ ADD: Properly handle keyboard type change
+                      _searchFocusNode.unfocus();
+                      Future.delayed(const Duration(milliseconds: 100), () {
+                        if (mounted) _searchFocusNode.requestFocus();
+                      });
                     }),
               ),
             ),
@@ -654,6 +662,11 @@ class _HomeScreenState extends State<HomeScreen>
                     (value) => setState(() {
                       _searchType = value!;
                       _searchController.clear();
+                      // ✅ ADD: Properly handle keyboard type change
+                      _searchFocusNode.unfocus();
+                      Future.delayed(const Duration(milliseconds: 100), () {
+                        if (mounted) _searchFocusNode.requestFocus();
+                      });
                     }),
               ),
             ),
@@ -733,7 +746,12 @@ class _HomeScreenState extends State<HomeScreen>
               child: Padding(
                 padding: const EdgeInsets.only(left: 20),
                 child: TextField(
+                  key: ValueKey(
+                    'search_field_$_searchType',
+                  ), // ✅ ADD: Force rebuild when search type changes
                   controller: _searchController,
+                  focusNode:
+                      _searchFocusNode, // ✅ ADD: Focus node for keyboard control
                   // ✅ ADD: Disable input when loading
                   enabled: !_isSearchLoading,
                   keyboardType:
