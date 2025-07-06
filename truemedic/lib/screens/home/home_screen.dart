@@ -27,6 +27,8 @@ class _HomeScreenState extends State<HomeScreen>
   String? _sessionId;
   String? _captchaImageBase64;
   bool _isCaptchaLoading = false;
+  // ✅ ADD: Loading state for search button
+  bool _isSearchLoading = false;
 
   final SupabaseClient supabaseClient = SupabaseClient(
     'https://zntlbtxvhpyoydqggtgw.supabase.co',
@@ -83,7 +85,8 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  void _validateAndSearch() {
+  // ✅ UPDATED: Add loading state management
+  void _validateAndSearch() async {
     final searchQuery = _searchController.text.trim();
 
     if (searchQuery.isEmpty) {
@@ -92,13 +95,14 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     if (_searchType == 0) {
-      _handleBmdcSearch(searchQuery);
+      await _handleBmdcSearch(searchQuery);
     } else {
       _handleNameSearch(searchQuery);
     }
   }
 
-  void _handleBmdcSearch(String bmdcNumber) {
+  // ✅ UPDATED: Make async and add loading state
+  Future<void> _handleBmdcSearch(String bmdcNumber) async {
     if (!RegExp(r'^\d+$').hasMatch(bmdcNumber)) {
       _showErrorSnackbar('Only numbers are allowed for BMDC');
       return;
@@ -113,9 +117,25 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
 
-    _initializeSession().then((_) {
-      if (_captchaImageBase64 != null) _showCaptchaDialog();
-    });
+    // ✅ ADD: Show loading state
+    setState(() => _isSearchLoading = true);
+
+    try {
+      await _initializeSession();
+
+      // ✅ ADD: Hide loading state
+      setState(() => _isSearchLoading = false);
+
+      if (_captchaImageBase64 != null) {
+        _showCaptchaDialog();
+      } else {
+        _showErrorSnackbar('Failed to load CAPTCHA. Please try again.');
+      }
+    } catch (e) {
+      // ✅ ADD: Hide loading state on error
+      setState(() => _isSearchLoading = false);
+      _showErrorSnackbar('Failed to initialize session: ${e.toString()}');
+    }
   }
 
   void _handleNameSearch(String name) async {
@@ -190,6 +210,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // ✅ UPDATED: Enhanced captcha dialog with better loading state
   void _showCaptchaDialog() {
     TextEditingController captchaController = TextEditingController();
 
@@ -203,8 +224,21 @@ class _HomeScreenState extends State<HomeScreen>
                   title: Row(
                     children: [
                       Text('Verify CAPTCHA', style: GoogleFonts.poppins()),
+                      const Spacer(),
                       IconButton(
-                        icon: const Icon(Icons.refresh),
+                        icon:
+                            _isCaptchaLoading
+                                ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.teal.shade800,
+                                    ),
+                                  ),
+                                )
+                                : const Icon(Icons.refresh),
                         onPressed:
                             _isCaptchaLoading
                                 ? null
@@ -219,46 +253,95 @@ class _HomeScreenState extends State<HomeScreen>
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (_isCaptchaLoading)
-                        Container(
-                          height: 100,
-                          alignment: Alignment.center,
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.teal.shade800,
-                            ),
-                          ),
-                        )
-                      else if (_captchaImageBase64 != null)
-                        SizedBox(
-                          height: 100,
-                          child: Image.memory(
-                            base64.decode(_captchaImageBase64!),
-                          ),
-                        )
-                      else
-                        Container(
-                          height: 100,
-                          alignment: Alignment.center,
-                          child: Text(
-                            'Failed to load CAPTCHA',
-                            style: GoogleFonts.poppins(color: Colors.red),
-                          ),
+                      // ✅ ENHANCED: Better loading state UI
+                      Container(
+                        height: 100,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                        child:
+                            _isCaptchaLoading
+                                ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      CircularProgressIndicator(
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.teal.shade800,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Loading CAPTCHA...',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                                : _captchaImageBase64 != null
+                                ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.memory(
+                                    base64.decode(_captchaImageBase64!),
+                                    fit: BoxFit.contain,
+                                  ),
+                                )
+                                : Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.error_outline,
+                                        color: Colors.red.shade400,
+                                        size: 32,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Failed to load CAPTCHA',
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.red.shade600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                      ),
+
                       const SizedBox(height: 20),
+
                       TextField(
                         controller: captchaController,
                         autofocus: true,
                         maxLength: 4,
+                        // ✅ ADD: Disable input when loading
+                        enabled: !_isCaptchaLoading,
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
                             RegExp(r'[a-zA-Z0-9]'),
                           ),
                         ],
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'Enter CAPTCHA code',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                           counterText: '',
+                          // ✅ ADD: Visual feedback when disabled
+                          fillColor:
+                              _isCaptchaLoading
+                                  ? Colors.grey.shade100
+                                  : Colors.white,
+                          filled: true,
+                        ),
+                        style: TextStyle(
+                          color:
+                              _isCaptchaLoading
+                                  ? Colors.grey.shade400
+                                  : Colors.black,
                         ),
                       ),
                     ],
@@ -269,10 +352,22 @@ class _HomeScreenState extends State<HomeScreen>
                       child: const Text('Cancel'),
                     ),
                     TextButton(
+                      // ✅ ADD: Disable verify button when loading
                       onPressed:
-                          () =>
-                              _handleCaptchaSubmission(captchaController.text),
-                      child: const Text('Verify'),
+                          _isCaptchaLoading
+                              ? null
+                              : () => _handleCaptchaSubmission(
+                                captchaController.text,
+                              ),
+                      child: Text(
+                        'Verify',
+                        style: TextStyle(
+                          color:
+                              _isCaptchaLoading
+                                  ? Colors.grey.shade400
+                                  : Colors.teal.shade800,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -377,7 +472,10 @@ class _HomeScreenState extends State<HomeScreen>
           children: [
             Expanded(
               child: RadioListTile<int>(
-                title: Text('Search By BMDC Number', style: GoogleFonts.poppins()),
+                title: Text(
+                  'Search By BMDC Number',
+                  style: GoogleFonts.poppins(),
+                ),
                 value: 0,
                 groupValue: _searchType,
                 onChanged:
@@ -452,6 +550,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // ✅ UPDATED: Enhanced search field with loading state
   Widget _buildSearchField() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
@@ -475,6 +574,8 @@ class _HomeScreenState extends State<HomeScreen>
                 padding: const EdgeInsets.only(left: 20),
                 child: TextField(
                   controller: _searchController,
+                  // ✅ ADD: Disable input when loading
+                  enabled: !_isSearchLoading,
                   keyboardType:
                       _searchType == 0
                           ? TextInputType.number
@@ -497,8 +598,14 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     border: InputBorder.none,
                   ),
-                  style: GoogleFonts.poppins(fontSize: 16),
-                  onSubmitted: (_) => _validateAndSearch(),
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    // ✅ ADD: Gray out text when loading
+                    color:
+                        _isSearchLoading ? Colors.grey.shade400 : Colors.black,
+                  ),
+                  onSubmitted:
+                      (_) => _isSearchLoading ? null : _validateAndSearch(),
                 ),
               ),
             ),
@@ -507,26 +614,58 @@ class _HomeScreenState extends State<HomeScreen>
               margin: const EdgeInsets.only(right: 5),
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal.shade800,
+                  // ✅ ADD: Change color when loading
+                  backgroundColor:
+                      _isSearchLoading
+                          ? Colors.grey.shade400
+                          : Colors.teal.shade800,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                 ),
-                onPressed: _validateAndSearch,
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Search',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
+                // ✅ ADD: Disable button when loading
+                onPressed: _isSearchLoading ? null : _validateAndSearch,
+                child:
+                    _isSearchLoading
+                        ? // ✅ ADD: Show loading indicator
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Loading...',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        )
+                        : // ✅ EXISTING: Normal search button
+                        Row(
+                          children: [
+                            const Icon(Icons.search, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Search',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
               ),
             ),
           ],

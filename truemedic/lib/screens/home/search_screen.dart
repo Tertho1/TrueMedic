@@ -273,13 +273,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
 
             const SizedBox(height: 16),
 
-            // Reviews Section (only for registered doctors)
-            if (_isRegisteredDoctor) ...[
-              _buildReviewsSection(),
-              const SizedBox(height: 16),
-            ],
-
-            // Professional Information & Appointment Info (only for registered doctors)
+            // ✅ MOVED: Professional Information & Appointment Info FIRST (for registered doctors)
             if (_isRegisteredDoctor && _appointmentInfo != null) ...[
               _buildProfessionalInfoCard(),
               const SizedBox(height: 16),
@@ -288,6 +282,12 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
               const SizedBox(height: 16),
             ] else if (_isRegisteredDoctor && _appointmentInfo == null) ...[
               _buildNoAppointmentInfoCard(),
+              const SizedBox(height: 16),
+            ],
+
+            // ✅ MOVED: Reviews Section AFTER appointment details (for registered doctors)
+            if (_isRegisteredDoctor) ...[
+              _buildReviewsSection(),
               const SizedBox(height: 16),
             ],
 
