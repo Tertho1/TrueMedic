@@ -75,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() => _isCaptchaLoading = true);
     try {
       final response = await http.get(
-        Uri.parse('https://tmapi-psi.vercel.app/init-session'),
+        Uri.parse('https://tm-api-zeta.vercel.app/init-session'),
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -107,36 +107,56 @@ class _HomeScreenState extends State<HomeScreen>
 
   // ✅ UPDATED: Make async and add loading state
   Future<void> _handleBmdcSearch(String bmdcNumber) async {
+    print('🔍 =================== BMDC SEARCH DEBUG ===================');
+    print('🔍 Input BMDC Number: "$bmdcNumber"');
+    print('🔍 Selected Student Type: $_regStudentType (1=MBBS, 2=BDS)');
+    print('🔍 BMDC Length: ${bmdcNumber.length}');
+    
     if (!RegExp(r'^\d+$').hasMatch(bmdcNumber)) {
+      print('❌ BMDC validation failed: Contains non-digits');
       _showErrorSnackbar('Only numbers are allowed for BMDC');
       return;
     }
 
+    // ✅ UPDATED: Fix BDS validation logic with debug
     if (_regStudentType == 1 && bmdcNumber.length != 6) {
+      print('❌ MBBS validation failed: Length is ${bmdcNumber.length}, expected 6');
       _showErrorSnackbar('MBBS registration must be 6 digits');
       return;
     }
-    if (_regStudentType == 2 && bmdcNumber.length >= 6) {
-      _showErrorSnackbar('BDS registration must be less than 6 digits');
-      return;
+    
+    // ✅ FIX: Correct BDS validation (5 digits or less, minimum 4)
+    if (_regStudentType == 2) {
+      if (bmdcNumber.length > 5) {
+        print('❌ BDS validation failed: Length is ${bmdcNumber.length}, must be 5 or less');
+        _showErrorSnackbar('BDS registration must be 5 digits or less');
+        return;
+      }
+      if (bmdcNumber.length < 4) {
+        print('❌ BDS validation failed: Length is ${bmdcNumber.length}, must be at least 4');
+        _showErrorSnackbar('BDS registration must be at least 4 digits');
+        return;
+      }
     }
 
-    // ✅ ADD: Show loading state
+    print('✅ BMDC validation passed');
     setState(() => _isSearchLoading = true);
 
     try {
+      print('🔄 Initializing session...');
       await _initializeSession();
-
-      // ✅ ADD: Hide loading state
+      
       setState(() => _isSearchLoading = false);
 
       if (_captchaImageBase64 != null) {
+        print('✅ CAPTCHA loaded successfully');
         _showCaptchaDialog();
       } else {
+        print('❌ CAPTCHA failed to load');
         _showErrorSnackbar('Failed to load CAPTCHA. Please try again.');
       }
     } catch (e) {
-      // ✅ ADD: Hide loading state on error
+      print('❌ Session initialization failed: $e');
       setState(() => _isSearchLoading = false);
       _showErrorSnackbar('Failed to initialize session: ${e.toString()}');
     }
@@ -166,19 +186,43 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<List<Doctor>> _searchLocalDatabase(String name) async {
+    print('🔍 =================== LOCAL SEARCH DEBUG ===================');
+    
+    // ✅ FIX: Use the currently selected student type
     final table = _regStudentType == 1 ? 'mbbs_doctors' : 'bds_doctors';
+    
+    print('🔍 Search Name: "$name"');
+    print('🔍 Student Type: $_regStudentType');
+    print('🔍 Search Table: $table');
 
-    final response = await supabaseClient
-        .from(table)
-        .select()
-        .ilike('full_name', '%$name%');
+    try {
+      final response = await supabaseClient
+          .from(table)
+          .select()
+          .ilike('full_name', '%$name%');
 
-    if (response is PostgrestException) {
-      throw Exception('Failed to fetch data from Supabase');
+      print('🔍 Query Response Type: ${response.runtimeType}');
+      
+      if (response is PostgrestException) {
+        print('❌ PostgrestException: $response');
+        throw Exception('Failed to fetch data from Supabase');
+      }
+
+      final data = response as List;
+      print('🔍 Found ${data.length} doctors in $table');
+      
+      if (data.isNotEmpty) {
+        print('🔍 First doctor sample: ${json.encode(data.first)}');
+      }
+      
+      final doctors = data.map((doc) => Doctor.fromJson(doc)).toList();
+      print('✅ Successfully parsed ${doctors.length} doctors');
+      
+      return doctors;
+    } catch (e) {
+      print('❌ Error searching database: $e');
+      rethrow;
     }
-
-    final data = response as List;
-    return data.map((doc) => Doctor.fromJson(doc)).toList();
   }
 
   void _showNameSearchResults(List<Doctor> doctors) {
@@ -390,6 +434,21 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _navigateToResults(String captchaText) async {
+    print('🔍 =================== API VERIFICATION DEBUG ===================');
+    print('🔍 Session ID: $_sessionId');
+    print('🔍 Registration Number: "${_searchController.text}"');
+    print('🔍 CAPTCHA Text: "$captchaText"');
+    print('🔍 Student Type: $_regStudentType (1=MBBS, 2=BDS)');
+    
+    final requestBody = {
+      'session_id': _sessionId,
+      'registration_number': _searchController.text,
+      'captcha_text': captchaText,
+      'reg_student': _regStudentType,
+    };
+    
+    print('🔍 Request Body: ${json.encode(requestBody)}');
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -397,45 +456,100 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     try {
+      print('🔄 Making API call to verify-doctor...');
+      
       final response = await http.post(
-        Uri.parse('https://tmapi-psi.vercel.app/verify-doctor'),
+        Uri.parse('https://tm-api-zeta.vercel.app/verify-doctor'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'session_id': _sessionId,
-          'registration_number': _searchController.text,
-          'captcha_text': captchaText,
-          'reg_student': _regStudentType,
-        }),
+        body: json.encode(requestBody),
       );
+
+      print('🔍 =================== API RESPONSE DEBUG ===================');
+      print('🔍 Response Status Code: ${response.statusCode}');
+      print('🔍 Response Headers: ${response.headers}');
+      print('🔍 Response Body: ${response.body}');
+      print('🔍 Response Body Length: ${response.body.length}');
 
       Navigator.pop(context);
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final doctor = Doctor.fromJson(data);
+        try {
+          final data = json.decode(response.body);
+          print('✅ JSON parsing successful');
+          print('🔍 Parsed Data Keys: ${data.keys.toList()}');
+          
+          // ✅ ADD: Check if the response contains an error
+          if (data['error'] != null) {
+            print('❌ API returned error: ${data['error']}');
+            _showErrorSnackbar('API Error: ${data['error']}');
+            return;
+          }
+          
+          // ✅ ADD: Check if doctor data is valid
+          if (data['name'] == null || data['registration_number'] == null) {
+            print('❌ Invalid doctor data received');
+            print('🔍 Name field: ${data['name']}');
+            print('🔍 Registration field: ${data['registration_number']}');
+            _showErrorSnackbar('No doctor found with this registration number');
+            return;
+          }
+          
+          print('✅ Creating Doctor object...');
+          final doctor = Doctor.fromJson(data);
+          print('✅ Doctor object created: ${doctor.fullName}');
 
-        await _storeDoctorLocally(doctor);
+          print('🔄 Storing doctor locally...');
+          await _storeDoctorLocally(doctor);
+          print('✅ Doctor stored locally');
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) =>
-                    SearchResultScreen(doctor: doctor, isFromLocal: false),
-          ),
-        );
+          print('🔄 Navigating to search results...');
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SearchResultScreen(doctor: doctor, isFromLocal: false),
+            ),
+          );
+        } catch (jsonError) {
+          print('❌ JSON parsing failed: $jsonError');
+          _showErrorSnackbar('Invalid response format from server');
+        }
       } else {
-        _showErrorSnackbar('Failed to fetch doctor details');
+        print('❌ API call failed with status: ${response.statusCode}');
+        
+        // ✅ IMPROVED: Better error handling for different status codes
+        try {
+          final errorData = json.decode(response.body);
+          final errorMessage = errorData['error'] ?? errorData['message'] ?? 'Failed to fetch doctor details';
+          print('🔍 Error message from API: $errorMessage');
+          _showErrorSnackbar('Search failed: $errorMessage');
+        } catch (e) {
+          print('❌ Could not parse error response: $e');
+          _showErrorSnackbar('Failed to fetch doctor details (${response.statusCode})');
+        }
       }
     } catch (e) {
       Navigator.pop(context);
-      _showErrorSnackbar('Error: ${e.toString()}');
+      print('❌ Network/Exception error: $e');
+      print('❌ Error type: ${e.runtimeType}');
+      _showErrorSnackbar('Network error: ${e.toString()}');
     }
+    
+    print('🔍 =================== END API DEBUG ===================');
   }
 
   Future<void> _storeDoctorLocally(Doctor doctor) async {
-    final table = _regStudentType == 1 ? 'mbbs_doctors' : 'bds_doctors';
-    await supabaseClient.from(table).upsert({
+    print('🔍 =================== LOCAL STORAGE DEBUG ===================');
+    
+    // ✅ FIX: Determine table based on BMDC length, not current selection
+    final bmdcLength = doctor.bmdcNumber.replaceAll(RegExp(r'[^0-9]'), '').length;
+    final table = bmdcLength == 6 ? 'mbbs_doctors' : 'bds_doctors';
+    
+    print('🔍 BMDC Number: "${doctor.bmdcNumber}"');
+    print('🔍 BMDC Length (digits only): $bmdcLength');
+    print('🔍 Selected Table: $table');
+    print('🔍 Current Student Type Selection: $_regStudentType');
+    
+    final doctorData = {
       'bmdc_number': doctor.bmdcNumber,
       'full_name': doctor.fullName,
       'father_name': doctor.fatherName,
@@ -448,7 +562,17 @@ class _HomeScreenState extends State<HomeScreen>
       'card_number': doctor.cardNumber,
       'dob': doctor.dob,
       'image_base64': doctor.doctorImageBase64,
-    });
+    };
+    
+    print('🔍 Data to store: ${json.encode(doctorData)}');
+    
+    try {
+      await supabaseClient.from(table).upsert(doctorData);
+      print('✅ Doctor stored successfully in $table table');
+    } catch (e) {
+      print('❌ Error storing doctor: $e');
+      throw e;
+    }
   }
 
   void _showErrorSnackbar(String message) {
@@ -683,25 +807,27 @@ class _HomeScreenState extends State<HomeScreen>
     return WillPopScope(
       onWillPop: () async {
         return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Exit App'),
-            content: const Text('Do you want to exit the app?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('No'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context, true);
-                  SystemNavigator.pop(); // ✅ Actually exit the app
-                },
-                child: const Text('Yes'),
-              ),
-            ],
-          ),
-        ) ?? false;
+              context: context,
+              builder:
+                  (context) => AlertDialog(
+                    title: const Text('Exit App'),
+                    content: const Text('Do you want to exit the app?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('No'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context, true);
+                          SystemNavigator.pop(); // ✅ Actually exit the app
+                        },
+                        child: const Text('Yes'),
+                      ),
+                    ],
+                  ),
+            ) ??
+            false;
       },
       child: Scaffold(
         // ✅ FIX: Add keyboard handling
