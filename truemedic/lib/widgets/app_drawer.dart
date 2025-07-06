@@ -33,7 +33,7 @@ class AppDrawer extends StatelessWidget {
                   child: Image.asset('assets/logo.jpeg', width: 60, height: 60),
                 ),
                 const SizedBox(height: 12),
-                Text(
+                const Text(
                   'TrueMedic',
                   style: TextStyle(
                     color: Colors.white,
@@ -57,13 +57,13 @@ class AppDrawer extends StatelessWidget {
 
           // Conditional menu items based on auth state
           if (isLoggedIn) ...[
-            // Profile option - only when logged in
+            // ✅ UPDATED: Smart Profile Navigation
             ListTile(
               leading: const Icon(Icons.person),
-              title: const Text('Profile'),
+              title: const Text('My Dashboard'),
               onTap: () {
                 Navigator.pop(context); // Close the drawer
-                _navigateToProfile(context);
+                _navigateToCorrectDashboard(context);
               },
             ),
 
@@ -116,8 +116,8 @@ class AppDrawer extends StatelessWidget {
                   width: 50,
                   height: 50,
                 ),
-                children: [
-                  const Text(
+                children: const [
+                  Text(
                     'TrueMedic helps verify doctor credentials and connect patients with healthcare professionals.',
                   ),
                 ],
@@ -137,8 +137,7 @@ class AppDrawer extends StatelessWidget {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder:
-          (dialogContext) => const Center(child: CircularProgressIndicator()),
+      builder: (dialogContext) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
@@ -153,7 +152,7 @@ class AppDrawer extends StatelessWidget {
         // Close loading dialog
         navigatorContext.pop();
 
-        // Navigate to welcome screen
+        // ✅ CHANGE: Navigate to home screen instead of welcome
         navigatorContext.pushNamedAndRemoveUntil('/home', (route) => false);
       }
     } catch (e) {
@@ -172,45 +171,65 @@ class AppDrawer extends StatelessWidget {
     }
   }
 
-  void _navigateToProfile(BuildContext context) async {
+  // ✅ NEW: Smart navigation to correct dashboard based on user type
+  void _navigateToCorrectDashboard(BuildContext context) async {
     try {
       final userId = supabase.auth.currentUser!.id;
+      print('🔍 Navigating dashboard for user: $userId');
 
-      // Check user type to redirect to correct dashboard
-      final userData =
-          await supabase.from('users').select().eq('id', userId).maybeSingle();
+      // Check users table first (for regular users and admins)
+      final userData = await supabase
+          .from('users')
+          .select('id, role')
+          .eq('id', userId)
+          .maybeSingle();
 
       if (userData != null) {
+        print('✅ Found user with role: ${userData['role']}');
+        
         // Check if admin role
         if (userData['role'] == 'admin') {
           Navigator.pushReplacementNamed(context, '/admin-dashboard');
           return;
-        } else if (userData['role'] == 'doctor') {
+        } else if (userData['role'] == 'user') {
           // Regular user
+          Navigator.pushReplacementNamed(context, '/user-dashboard');
+          return;
+        } else if (userData['role'] == 'doctor' || userData['role'] == 'doctor_unverified') {
+          // Doctor (verified or unverified)
           Navigator.pushReplacementNamed(context, '/doctor-dashboard');
           return;
         } else {
+          // Default to user dashboard for unknown roles
           Navigator.pushReplacementNamed(context, '/user-dashboard');
           return;
         }
       }
 
-      // Check if doctor
-      final doctorData =
-          await supabase
-              .from('doctors')
-              .select()
-              .eq('id', userId)
-              .maybeSingle();
+      // Check doctors table if not found in users
+      final doctorData = await supabase
+          .from('doctors')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle();
 
       if (doctorData != null) {
+        print('✅ Found doctor profile');
         Navigator.pushReplacementNamed(context, '/doctor-dashboard');
         return;
       }
+
+      // If nothing found, default to user dashboard
+      print('⚠️ No profile found, defaulting to user dashboard');
+      Navigator.pushReplacementNamed(context, '/user-dashboard');
+
     } catch (e) {
+      print('❌ Error navigating to dashboard: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading profile: ${e.toString()}')),
       );
+      // Default to user dashboard on error
+      Navigator.pushReplacementNamed(context, '/user-dashboard');
     }
   }
 }

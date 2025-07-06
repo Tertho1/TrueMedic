@@ -26,38 +26,18 @@ class _SplashScreenState extends State<SplashScreen> {
     
     if (!mounted) return;
     
-    // If we have a session, redirect to the dashboard
+    // ✅ FIX: If we have a session, go to HOME instead of dashboard
     if (session != null) {
-      print("User is logged in: ${session.user.id}");
+      print("✅ User is logged in: ${session.user.id}");
       
-      // Check user type (adjust based on your data model)
-      final userData = await supabase
-          .from('users')
-          .select()
-          .eq('id', session.user.id)
-          .maybeSingle();
-          
-      if (userData != null) {
-        Navigator.of(context).pushReplacementNamed('/user-dashboard');
-        return;
-      }
-      
-      // Check if doctor
-      final doctorData = await supabase
-          .from('doctors')
-          .select()
-          .eq('id', session.user.id)
-          .maybeSingle();
-          
-      if (doctorData != null) {
-        Navigator.of(context).pushReplacementNamed('/doctor-dashboard');
-        return;
-      }
+      // ✅ CHANGE: Always go to home screen when session exists
+      Navigator.of(context).pushReplacementNamed('/home');
+      return;
     } else {
-      print("No active session found");
+      print("❌ No active session found");
     }
     
-    // No session or no user profile found, go to welcome screen
+    // No session found, go to welcome screen
     Navigator.of(context).pushReplacementNamed('/');
   }
 
@@ -75,6 +55,15 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 30),
             const CircularProgressIndicator(),
+            const SizedBox(height: 20),
+            const Text(
+              'TrueMedic',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+              ),
+            ),
           ],
         ),
       ),

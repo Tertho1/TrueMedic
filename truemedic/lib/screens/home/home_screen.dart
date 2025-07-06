@@ -678,6 +678,11 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     return BaseScaffold(
       title: 'TrueMedic',
+      // ✅ ADD: Show user status in app bar actions
+      actions: [
+        // Show login status and user actions
+        _buildUserActions(),
+      ],
       body: SizedBox.expand(
         child: Stack(
           children: [
@@ -697,6 +702,8 @@ class _HomeScreenState extends State<HomeScreen>
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
+                      // ✅ ADD: Welcome message for logged-in users
+                      _buildWelcomeMessage(),
                       _buildSearchTypeSelector(),
                       _buildStudentTypeSelector(),
                       _buildSearchField(),
@@ -731,4 +738,201 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
+
+  // ✅ NEW: User actions for app bar
+  Widget _buildUserActions() {
+    final isLoggedIn = supabaseClient.auth.currentSession != null;
+    
+    if (isLoggedIn) {
+      return PopupMenuButton<String>(
+        icon: const Icon(Icons.account_circle, color: Colors.white),
+        onSelected: (value) {
+          switch (value) {
+            case 'dashboard':
+              _navigateToUserDashboard();
+              break;
+            case 'logout':
+              _handleLogout();
+              break;
+          }
+        },
+        itemBuilder: (context) => [
+          const PopupMenuItem(
+            value: 'dashboard',
+            child: Row(
+              children: [
+                Icon(Icons.dashboard),
+                SizedBox(width: 8),
+                Text('My Dashboard'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'logout',
+            child: Row(
+              children: [
+                Icon(Icons.logout),
+                SizedBox(width: 8),
+                Text('Logout'),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else {
+      return TextButton(
+        onPressed: () => Navigator.pushNamed(context, '/user-or-doctor'),
+        child: const Text(
+          'Login',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+  }
+
+  // ✅ NEW: Welcome message for logged-in users
+  Widget _buildWelcomeMessage() {
+    final user = supabaseClient.auth.currentUser;
+    
+    if (user == null) return const SizedBox.shrink();
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.teal.shade100,
+              borderRadius: BorderRadius.circular(50),
+            ),
+            child: Icon(
+              Icons.person,
+              color: Colors.teal.shade700,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome back!',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.teal.shade700,
+                  ),
+                ),
+                Text(
+                  user.email ?? 'User',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: _navigateToUserDashboard,
+            child: Text(
+              'Dashboard',
+              style: GoogleFonts.poppins(
+                color: Colors.teal.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NEW: Smart navigation to user dashboard
+  void _navigateToUserDashboard() async {
+    try {
+      final userId = supabaseClient.auth.currentUser?.id;
+      if (userId == null) return;
+
+      // Check user type to redirect to correct dashboard
+      final userData = await supabaseClient
+          .from('users')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (userData != null) {
+        // Check if admin role
+        if (userData['role'] == 'admin') {
+          Navigator.pushNamed(context, '/admin-dashboard');
+          return;
+        } else if (userData['role'] == 'user') {
+          Navigator.pushNamed(context, '/user-dashboard');
+          return;
+        } else if (userData['role'] == 'doctor' || userData['role'] == 'doctor_unverified') {
+          Navigator.pushNamed(context, '/doctor-dashboard');
+          return;
+        }
+      }
+
+      // Check if doctor
+      final doctorData = await supabaseClient
+          .from('doctors')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (doctorData != null) {
+        Navigator.pushNamed(context, '/doctor-dashboard');
+        return;
+      }
+
+      // Default to user dashboard
+      Navigator.pushNamed(context, '/user-dashboard');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+
+  // ✅ NEW: Handle logout from home screen
+  void _handleLogout() async {
+    try {
+      await supabaseClient.auth.signOut();
+      
+      if (mounted) {
+        setState(() {}); // Refresh UI to show login button
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Logged out successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Logout error: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  // ... rest of your existing methods remain the same ...
 }
