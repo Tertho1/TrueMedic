@@ -20,16 +20,13 @@ class SearchResultScreen extends StatefulWidget {
   });
 
   @override
-  _SearchResultScreenState createState() => _SearchResultScreenState();
+  State<SearchResultScreen> createState() => _SearchResultScreenState(); // ✅ FIXED
 }
 
 class _SearchResultScreenState extends State<SearchResultScreen> {
   late Doctor _doctor;
   bool _isUpdating = false;
-  final SupabaseClient _supabaseClient = SupabaseClient(
-    'https://zntlbtxvhpyoydqggtgw.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpudGxidHh2aHB5b3lkcWdndGd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NDY5NjEsImV4cCI6MjA1NjUyMjk2MX0.ghWxTU_yKCkZ5KabTi7n7OGP2J24u0q3erAZgNunw7U',
-  );
+  final SupabaseClient _supabaseClient = Supabase.instance.client; // ✅ FIXED
 
   final _reviewService = ReviewService();
   ReviewStats? _reviewStats;
@@ -57,13 +54,35 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     });
   }
 
+  // ✅ ADDED: Missing build method
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Doctor Details', style: GoogleFonts.poppins()),
+        backgroundColor: Colors.teal.shade600,
+        foregroundColor: Colors.white,
+        actions: [
+          if (!widget.isFromLocal)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _isUpdating ? null : _checkForUpdates,
+            ),
+        ],
+      ),
+      body: _buildDoctorDetails(),
+    );
+  }
+
   Future<void> _checkForUpdates() async {
     setState(() => _isUpdating = true);
     try {
       final updatedDoctor = await _fetchUpdatedInfo();
       if (updatedDoctor != null) {
         await _storeDoctorLocally(updatedDoctor);
-        setState(() => _doctor = updatedDoctor);
+        if (mounted) {
+          setState(() => _doctor = updatedDoctor);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -72,7 +91,9 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
         );
       }
     } finally {
-      setState(() => _isUpdating = false);
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
     }
   }
 
@@ -118,247 +139,23 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   }
 
   Future<void> _loadDoctorReviewStats(String doctorBmdcNumber) async {
+    if (!mounted) return;
     setState(() => _loadingReviews = true);
 
     try {
-      // 🔍 DEBUG: Print what we're searching for
-      print(
-        '🔍 =================== DOCTOR REGISTRATION CHECK ===================',
-      );
-      print('🔍 Searching for BMDC: "$doctorBmdcNumber"');
-      print('🔍 BMDC type: ${doctorBmdcNumber.runtimeType}');
-      print('🔍 BMDC length: ${doctorBmdcNumber.length}');
-      print('🔍 BMDC characters: ${doctorBmdcNumber.split('').join(' ')}');
-
-      // Convert search term to string (ensure it's text)
-      final searchBmdcText = doctorBmdcNumber.toString();
-      print('🔍 Search BMDC as text: "$searchBmdcText"');
-
-      // First, let's see what BMDC numbers exist in doctors table
-      print('\n📊 =================== DATABASE INSPECTION ===================');
-      final allDoctorsResponse = await _supabaseClient
-          .from('doctors')
-          .select(
-            'id, bmdc_number, full_name, verified, verification_pending, rejected',
-          )
-          .order('created_at', ascending: false)
-          .limit(15);
-
-      print('📊 Total doctors found in database: ${allDoctorsResponse.length}');
-      print('📊 Sample doctors in database:');
-
-      for (int i = 0; i < allDoctorsResponse.length; i++) {
-        final doc = allDoctorsResponse[i];
-        final dbBmdc = doc['bmdc_number']?.toString() ?? 'null';
-        final dbBmdcLength = dbBmdc.length;
-        final dbBmdcChars = dbBmdc.split('').join(' ');
-
-        print('   ${i + 1}. ID: ${doc['id']}');
-        print('      BMDC: "$dbBmdc" (length: $dbBmdcLength)');
-        print('      BMDC chars: $dbBmdcChars');
-        print('      Name: ${doc['full_name']}');
-        print(
-          '      Verified: ${doc['verified']} | Pending: ${doc['verification_pending']} | Rejected: ${doc['rejected']}',
-        );
-        print('      Raw BMDC type: ${doc['bmdc_number'].runtimeType}');
-        print('   ---');
-      }
-
-      // Get counts for verification status
-      final verifiedCount =
-          allDoctorsResponse.where((doc) => doc['verified'] == true).length;
-      final pendingCount =
-          allDoctorsResponse
-              .where((doc) => doc['verification_pending'] == true)
-              .length;
-      final rejectedCount =
-          allDoctorsResponse.where((doc) => doc['rejected'] == true).length;
-
-      print('\n📊 Doctor Status Summary:');
-      print('   ✅ Verified: $verifiedCount');
-      print('   ⏳ Pending: $pendingCount');
-      print('   ❌ Rejected: $rejectedCount');
-
-      // Extract just the numbers from the search term for flexible matching
-      final searchNumbers = searchBmdcText.replaceAll(RegExp(r'[^0-9]'), '');
-      print(
-        '\n🔢 Search numbers only: "$searchNumbers" (length: ${searchNumbers.length})',
-      );
-
-      // Try multiple search strategies
-      Map<String, dynamic>? registeredDoctorResponse;
-
-      // Strategy 1: Exact match (search term as-is)
-      print(
-        '\n🎯 =================== STRATEGY 1: EXACT MATCH ===================',
-      );
-      print('🎯 Searching for exact match: "$searchBmdcText"');
-
-      registeredDoctorResponse =
+      // Simplified search logic
+      final registeredDoctorResponse =
           await _supabaseClient
               .from('doctors')
               .select(
                 'id, verified, full_name, bmdc_number, verification_pending, rejected',
               )
-              .eq('bmdc_number', searchBmdcText)
+              .eq('bmdc_number', doctorBmdcNumber)
               .maybeSingle();
 
-      if (registeredDoctorResponse != null) {
-        print(
-          '🎯 Strategy 1 found doctor: ${registeredDoctorResponse['full_name']}',
-        );
-        print(
-          '🎯 Doctor verification status: verified=${registeredDoctorResponse['verified']}, pending=${registeredDoctorResponse['verification_pending']}, rejected=${registeredDoctorResponse['rejected']}',
-        );
-      } else {
-        print('🎯 Strategy 1 result: No exact match found');
-      }
-
-      // Strategy 2: Manual comparison with numbers extraction
-      if (registeredDoctorResponse == null && searchNumbers.isNotEmpty) {
-        print(
-          '\n🎯 =================== STRATEGY 2: NUMBER COMPARISON ===================',
-        );
-        print(
-          '🎯 Comparing search numbers "$searchNumbers" with all doctors...',
-        );
-
-        // Get ALL doctors for comparison (not just verified ones)
-        final allDoctorsForComparison = await _supabaseClient
-            .from('doctors')
-            .select(
-              'id, verified, full_name, bmdc_number, verification_pending, rejected',
-            );
-
-        print(
-          '🔍 Comparing with ${allDoctorsForComparison.length} total doctors:',
-        );
-
-        for (var doc in allDoctorsForComparison) {
-          final dbBmdcText = doc['bmdc_number']?.toString() ?? '';
-          final dbNumbers = dbBmdcText.replaceAll(RegExp(r'[^0-9]'), '');
-
-          print('   DB BMDC: "$dbBmdcText" -> Numbers: "$dbNumbers"');
-          print(
-            '   Comparing: "$searchNumbers" == "$dbNumbers" ? ${searchNumbers == dbNumbers}',
-          );
-          print(
-            '   Doctor: ${doc['full_name']} (verified: ${doc['verified']})',
-          );
-
-          if (dbNumbers == searchNumbers && searchNumbers.isNotEmpty) {
-            registeredDoctorResponse = doc;
-            print('✅ Found match via number comparison!');
-            print('✅ Matched doctor: ${doc['full_name']}');
-            print(
-              '✅ Doctor status: verified=${doc['verified']}, pending=${doc['verification_pending']}, rejected=${doc['rejected']}',
-            );
-            break;
-          }
-          print('   ---');
-        }
-
-        if (registeredDoctorResponse == null) {
-          print('❌ No match found via number comparison');
-        }
-      }
-
-      // Strategy 3: Try with common prefixes (fallback)
-      if (registeredDoctorResponse == null && searchNumbers.isNotEmpty) {
-        print(
-          '\n🎯 =================== STRATEGY 3: PREFIX MATCHING ===================',
-        );
-        final prefixes = [
-          'A-',
-          'BMDC-',
-          'B-',
-          'M-',
-          'a-',
-          'bmdc-',
-          'A',
-          'B',
-          'M',
-        ];
-
-        for (String prefix in prefixes) {
-          final testBmdc = prefix + searchNumbers;
-          print('   Testing: "$testBmdc"');
-
-          registeredDoctorResponse =
-              await _supabaseClient
-                  .from('doctors')
-                  .select(
-                    'id, verified, full_name, bmdc_number, verification_pending, rejected',
-                  )
-                  .eq('bmdc_number', testBmdc)
-                  .maybeSingle();
-
-          if (registeredDoctorResponse != null) {
-            print('✅ Found match with prefix "$prefix": "$testBmdc"');
-            print('✅ Doctor: ${registeredDoctorResponse['full_name']}');
-            print(
-              '✅ Status: verified=${registeredDoctorResponse['verified']}, pending=${registeredDoctorResponse['verification_pending']}, rejected=${registeredDoctorResponse['rejected']}',
-            );
-            break;
-          }
-        }
-
-        if (registeredDoctorResponse == null) {
-          print('❌ No match found with prefixes');
-        }
-      }
-
-      // Strategy 4: Case-insensitive search using ilike
-      if (registeredDoctorResponse == null && searchNumbers.isNotEmpty) {
-        print(
-          '\n🎯 =================== STRATEGY 4: PATTERN MATCHING ===================',
-        );
-        print('🎯 Searching with ilike pattern: "%$searchNumbers%"');
-
-        // Try pattern matching with ilike
-        registeredDoctorResponse =
-            await _supabaseClient
-                .from('doctors')
-                .select(
-                  'id, verified, full_name, bmdc_number, verification_pending, rejected',
-                )
-                .ilike('bmdc_number', '%$searchNumbers%')
-                .maybeSingle();
-
-        if (registeredDoctorResponse != null) {
-          print('✅ Found match with pattern matching');
-          print('✅ Doctor: ${registeredDoctorResponse['full_name']}');
-          print('✅ BMDC: ${registeredDoctorResponse['bmdc_number']}');
-          print(
-            '✅ Status: verified=${registeredDoctorResponse['verified']}, pending=${registeredDoctorResponse['verification_pending']}, rejected=${registeredDoctorResponse['rejected']}',
-          );
-        } else {
-          print('❌ No match found with pattern matching');
-        }
-      }
-
-      // Final evaluation
-      print('\n🏁 =================== FINAL EVALUATION ===================');
-      if (registeredDoctorResponse != null) {
-        print('✅ Doctor found in database!');
-        print('✅ Doctor ID: ${registeredDoctorResponse['id']}');
-        print('✅ Doctor Name: ${registeredDoctorResponse['full_name']}');
-        print('✅ BMDC in DB: ${registeredDoctorResponse['bmdc_number']}');
-        print('✅ Verification Status:');
-        print('   - Verified: ${registeredDoctorResponse['verified']}');
-        print(
-          '   - Pending: ${registeredDoctorResponse['verification_pending']}',
-        );
-        print('   - Rejected: ${registeredDoctorResponse['rejected']}');
-        print(
-          '   - Raw Data: ${registeredDoctorResponse.toString()}',
-        ); // Add this line
-
-        // Check if doctor is verified
-        final isVerified = registeredDoctorResponse['verified'] == true;
-        print('✅ Is doctor verified and eligible for reviews? $isVerified');
-
-        if (isVerified) {
+      if (mounted) {
+        if (registeredDoctorResponse != null &&
+            registeredDoctorResponse['verified'] == true) {
           // Doctor found and verified - load reviews
           final doctorId = registeredDoctorResponse['id'];
           final stats = await _reviewService.getDoctorReviewStats(doctorId);
@@ -367,41 +164,31 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
             _registeredDoctorId = doctorId;
             _isRegisteredDoctor = true;
           });
-          print('✅ Doctor is registered and verified - reviews loaded');
         } else {
           setState(() {
             _reviewStats = null;
             _registeredDoctorId = null;
             _isRegisteredDoctor = false;
           });
-          print('⚠️  Doctor found but not verified yet');
         }
-      } else {
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
           _reviewStats = null;
           _registeredDoctorId = null;
           _isRegisteredDoctor = false;
         });
-        print('❌ Doctor not found in TrueMedic database');
       }
-
-      print('🏁 =================== SEARCH COMPLETE ===================\n');
-    } catch (e) {
-      print('💥 Error loading review stats: $e');
-      print('💥 Error type: ${e.runtimeType}');
-      print('💥 Stack trace: ${StackTrace.current}');
-      setState(() {
-        _reviewStats = null;
-        _registeredDoctorId = null;
-        _isRegisteredDoctor = false;
-      });
     } finally {
-      setState(() => _loadingReviews = false);
+      if (mounted) {
+        setState(() => _loadingReviews = false);
+      }
     }
   }
 
   Future<void> _loadDoctorAppointmentInfo(String? doctorId) async {
-    if (doctorId == null) return;
+    if (doctorId == null || !mounted) return;
 
     setState(() => _loadingAppointmentInfo = true);
 
@@ -419,7 +206,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
               .eq('doctor_id', doctorId)
               .maybeSingle();
 
-      if (appointmentResponse != null) {
+      if (appointmentResponse != null && mounted) {
         // Load appointment locations
         final locationsResponse = await _supabaseClient
             .from('appointment_locations')
@@ -435,138 +222,511 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
             ''')
             .eq('doctor_appointment_id', appointmentResponse['id']);
 
-        setState(() {
-          _appointmentInfo = {
-            ...appointmentResponse,
-            'locations': locationsResponse,
-          };
-        });
+        if (mounted) {
+          setState(() {
+            _appointmentInfo = {
+              ...appointmentResponse,
+              'locations': locationsResponse,
+            };
+          });
+        }
       }
     } catch (e) {
-      print('Error loading appointment info: $e');
+      // Handle error silently
     } finally {
-      setState(() => _loadingAppointmentInfo = false);
+      if (mounted) {
+        setState(() => _loadingAppointmentInfo = false);
+      }
     }
   }
 
   Widget _buildDoctorDetails() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_isUpdating)
-            LinearProgressIndicator(
-              backgroundColor: Colors.teal.shade100,
-              minHeight: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.teal.shade800),
-            ),
-          if (_doctor.doctorImageBase64.isNotEmpty)
-            Center(
-              child: Image.memory(
-                base64.decode(_doctor.doctorImageBase64),
-                height: 150,
-                filterQuality: FilterQuality.high,
-              ),
-            ),
-          const SizedBox(height: 20),
-          _buildDetailItem('Name', _doctor.fullName),
-          _buildDetailItem('BMDC Number', _doctor.bmdcNumber),
-          _buildDetailItem('Status', _doctor.status),
-          _buildDetailItem('Date of Birth', _doctor.dob),
-          _buildDetailItem('Blood Group', _doctor.bloodGroup),
-          _buildDetailItem('Father\'s Name', _doctor.fatherName),
-          _buildDetailItem('Mother\'s Name', _doctor.motherName),
-          _buildDetailItem('Registration Year', _doctor.regYear),
-          _buildDetailItem('Valid Till', _doctor.validTill),
-          _buildDetailItem('Card Number', _doctor.cardNumber),
-          if (!widget.isFromLocal)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                'Last Updated: ${DateTime.now().toString().substring(0, 16)}',
-                style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          const SizedBox(height: 20),
-
-          // Doctor Status Card
-          Card(
-            margin: const EdgeInsets.symmetric(vertical: 8),
-            color:
-                _isRegisteredDoctor
-                    ? Colors.green.shade50
-                    : Colors.orange.shade50,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _isRegisteredDoctor ? Icons.verified : Icons.info,
-                        color:
-                            _isRegisteredDoctor ? Colors.green : Colors.orange,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _isRegisteredDoctor
-                            ? 'Verified TrueMedic Doctor'
-                            : 'BMDC Verified Doctor',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color:
-                              _isRegisteredDoctor
-                                  ? Colors.green.shade700
-                                  : Colors.orange.shade700,
-                        ),
-                      ),
-                    ],
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _checkForUpdates();
+        await _loadDoctorReviewStats(_doctor.bmdcNumber);
+      },
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // UPDATE PROGRESS INDICATOR
+            if (_isUpdating)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                child: LinearProgressIndicator(
+                  backgroundColor: Colors.teal.shade100,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.teal.shade600,
                   ),
-                  const SizedBox(height: 8),
+                ),
+              ),
+
+            // REDESIGNED DOCTOR PROFILE CARD (like doctor dashboard)
+            _buildDoctorProfileCard(),
+
+            const SizedBox(height: 16),
+
+            // VERIFICATION STATUS CARD (Enhanced)
+            _buildVerificationStatusCard(),
+
+            const SizedBox(height: 16),
+
+            // Reviews Section (only for registered doctors)
+            if (_isRegisteredDoctor) ...[
+              _buildReviewsSection(),
+              const SizedBox(height: 16),
+            ],
+
+            // Professional Information & Appointment Info (only for registered doctors)
+            if (_isRegisteredDoctor && _appointmentInfo != null) ...[
+              _buildProfessionalInfoCard(),
+              const SizedBox(height: 16),
+            ] else if (_isRegisteredDoctor && _loadingAppointmentInfo) ...[
+              _buildLoadingCard('Loading appointment information...'),
+              const SizedBox(height: 16),
+            ] else if (_isRegisteredDoctor && _appointmentInfo == null) ...[
+              _buildNoAppointmentInfoCard(),
+              const SizedBox(height: 16),
+            ],
+
+            // Registration Invitation (only for non-registered doctors)
+            if (!_isRegisteredDoctor) ...[
+              _buildInvitationCard(),
+              const SizedBox(height: 16),
+            ],
+
+            // Report Section (for all doctors)
+            _buildReportCard(),
+
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Doctor Profile Card (inspired by doctor dashboard)
+  Widget _buildDoctorProfileCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // Doctor Image
+            Center(
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _isRegisteredDoctor ? Colors.green : Colors.orange,
+                    width: 3,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child:
+                    _doctor.doctorImageBase64.isNotEmpty
+                        ? CircleAvatar(
+                          radius: 50,
+                          backgroundImage: MemoryImage(
+                            base64.decode(_doctor.doctorImageBase64),
+                          ),
+                        )
+                        : CircleAvatar(
+                          radius: 50,
+                          backgroundColor: Colors.teal.shade100,
+                          child: Icon(
+                            Icons.medical_services,
+                            size: 40,
+                            color: Colors.teal.shade600,
+                          ),
+                        ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // DOCTOR NAME WITH VERIFICATION BADGE
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    _doctor.fullName,
+                    style: GoogleFonts.poppins(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade800,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+
+                // VERIFICATION ICON
+                if (_isRegisteredDoctor) ...[
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: 'Verified TrueMedic Doctor',
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade100,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.green.shade300),
+                      ),
+                      child: Icon(
+                        Icons.verified,
+                        color: Colors.green.shade700,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // BMDC Number with enhanced styling
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.teal.shade50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.teal.shade200),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.medical_services,
+                    color: Colors.teal.shade600,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
                   Text(
-                    _isRegisteredDoctor
-                        ? 'This doctor is registered and verified on TrueMedic. You can view reviews and book appointments.'
-                        : 'This doctor is verified by BMDC but not yet registered on TrueMedic. Encourage them to join!',
-                    style: const TextStyle(fontSize: 14),
+                    'BMDC: ${_doctor.bmdcNumber}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.teal.shade700,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
 
-          // Reviews Section (only for registered doctors)
-          if (_isRegisteredDoctor) ...[
-            if (_reviewStats != null) ...[
-              Card(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
+            const SizedBox(height: 16),
+
+            // ENHANCED DOCTOR DETAILS GRID
+            _buildDoctorDetailsGrid(),
+
+            // Last Updated Info
+            if (!widget.isFromLocal) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.sync, color: Colors.blue.shade600, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Last Updated: ${DateTime.now().toString().substring(0, 16)}',
+                      style: TextStyle(
+                        color: Colors.blue.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Enhanced Doctor Details Grid
+  Widget _buildDoctorDetailsGrid() {
+    final details = [
+      {'label': 'Status', 'value': _doctor.status, 'icon': Icons.info},
+      {'label': 'Date of Birth', 'value': _doctor.dob, 'icon': Icons.cake},
+      {
+        'label': 'Blood Group',
+        'value': _doctor.bloodGroup,
+        'icon': Icons.water_drop,
+      },
+      {
+        'label': 'Father\'s Name',
+        'value': _doctor.fatherName,
+        'icon': Icons.person,
+      },
+      {
+        'label': 'Mother\'s Name',
+        'value': _doctor.motherName,
+        'icon': Icons.person_outline,
+      },
+      {
+        'label': 'Registration Year',
+        'value': _doctor.regYear,
+        'icon': Icons.calendar_today,
+      },
+      {
+        'label': 'Valid Till',
+        'value': _doctor.validTill,
+        'icon': Icons.event_available,
+      },
+      {
+        'label': 'Card Number',
+        'value': _doctor.cardNumber,
+        'icon': Icons.badge,
+      },
+    ];
+
+    return Column(
+      children:
+          details
+              .map(
+                (detail) => _buildDetailRow(
+                  detail['label'] as String,
+                  detail['value'] as String,
+                  detail['icon'] as IconData,
+                ),
+              )
+              .toList(),
+    );
+  }
+
+  // UPDATED: Enhanced Detail Row
+  Widget _buildDetailRow(String label, String value, IconData icon) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.teal.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Colors.teal.shade600, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value.isNotEmpty ? value : 'N/A',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // NEW: Enhanced Verification Status Card
+  Widget _buildVerificationStatusCard() {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            colors:
+                _isRegisteredDoctor
+                    ? [Colors.green.shade50, Colors.green.shade100]
+                    : [Colors.orange.shade50, Colors.orange.shade100],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _isRegisteredDoctor ? Colors.green : Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isRegisteredDoctor
+                          ? Icons.verified_user
+                          : Icons.info_outline,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isRegisteredDoctor
+                              ? 'Verified TrueMedic Doctor'
+                              : 'BMDC Verified Doctor',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color:
+                                _isRegisteredDoctor
+                                    ? Colors.green.shade700
+                                    : Colors.orange.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _isRegisteredDoctor
+                              ? 'This doctor is registered and verified on TrueMedic'
+                              : 'This doctor is verified by BMDC but not registered on TrueMedic yet',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              if (_isRegisteredDoctor) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade300),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: Colors.green.shade600,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'You can view reviews and appointment information',
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // NEW: Enhanced Reviews Section
+  Widget _buildReviewsSection() {
+    if (_reviewStats != null) {
+      return Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.star,
+                      color: Colors.amber.shade600,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Patient Reviews',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Rating Display
+              Row(
+                children: [
+                  Text(
+                    '${_reviewStats!.averageRating.toStringAsFixed(1)}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber.shade600,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${_reviewStats!.averageRating.toStringAsFixed(1)} / 5.0',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '(${_reviewStats!.totalReviews} reviews)',
-                            style: TextStyle(color: Colors.grey.shade600),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
                       Row(
                         children: List.generate(5, (index) {
                           return Icon(
@@ -574,391 +734,514 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                                 ? Icons.star
                                 : Icons.star_border,
                             color: Colors.amber,
-                            size: 16,
+                            size: 18,
                           );
                         }),
                       ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _navigateToReviews(),
-                              icon: const Icon(Icons.reviews),
-                              label: const Text('See Reviews'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _navigateToWriteReview(),
-                              icon: const Icon(Icons.rate_review),
-                              label: const Text('Write Review'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ] else if (!_loadingReviews) ...[
-              Card(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'No reviews yet',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _navigateToWriteReview(),
-                              icon: const Icon(Icons.rate_review),
-                              label: const Text('Be the First to Review'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ],
-
-          // Appointment Information (only for registered doctors)
-          if (_isRegisteredDoctor && _appointmentInfo != null) ...[
-            Card(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.local_hospital, color: Colors.teal),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Professional Information',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Professional Details
-                    if (_appointmentInfo!['designation'] != null) ...[
-                      _buildInfoRow(
-                        'Designation',
-                        _appointmentInfo!['designation'] ?? 'N/A',
-                      ),
-                    ],
-                    if (_appointmentInfo!['specialities'] != null) ...[
-                      _buildInfoRow(
-                        'Specialities',
-                        _formatSpecialities(_appointmentInfo!['specialities']),
-                      ),
-                    ],
-                    if (_appointmentInfo!['experience'] != null) ...[
-                      _buildInfoRow(
-                        'Experience',
-                        '${_appointmentInfo!['experience']} years',
-                      ),
-                    ],
-
-                    const SizedBox(height: 16),
-
-                    // ✅ UPDATED: Check if user is logged in before showing appointment details
-                    Builder(
-                      builder: (context) {
-                        final supabase = Supabase.instance.client;
-                        final isLoggedIn = supabase.auth.currentUser != null;
-
-                        if (!isLoggedIn) {
-                          // Show login prompt for non-logged-in users
-                          return Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.blue.shade200),
-                            ),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.lock_outline,
-                                  color: Colors.blue.shade700,
-                                  size: 32,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Login Required',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue.shade700,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Please log in to view appointment information',
-                                  style: TextStyle(
-                                    color: Colors.blue.shade600,
-                                    fontSize: 14,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 12),
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.pushNamed(context, '/user-login');
-                                  },
-                                  icon: const Icon(Icons.login),
-                                  label: const Text('Login'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        // ✅ UPDATED: "Appointment Information" button for logged-in users
-                        return SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              _showAppointmentInformation();
-                            },
-                            icon: const Icon(Icons.info_outline),
-                            label: const Text('Appointment Information'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.teal,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ] else if (_isRegisteredDoctor && _loadingAppointmentInfo) ...[
-            const Card(
-              margin: EdgeInsets.symmetric(vertical: 8),
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
-          ] else if (_isRegisteredDoctor && _appointmentInfo == null) ...[
-            Card(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    const Icon(Icons.info, color: Colors.grey, size: 32),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Appointment information not available',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'This doctor hasn\'t set up appointment details yet',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-
-          // Registration Invitation (only for non-registered doctors)
-          if (!_isRegisteredDoctor) ...[
-            Card(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              color: Colors.blue.shade50,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.person_add, color: Colors.blue.shade700),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Invite to TrueMedic',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Help patients by encouraging this doctor to join TrueMedic for reviews and appointment booking.',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Invitation feature coming soon!'),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.share),
-                      label: const Text('Invite Doctor'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-
-          // Report Section (for all doctors)
-          Card(
-            margin: const EdgeInsets.symmetric(vertical: 8),
-            color: Colors.red.shade50,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.report_problem, color: Colors.red.shade700),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Report Suspicious Activity',
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_reviewStats!.totalReviews} reviews',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Found something suspicious? Help protect others by reporting fake doctors.',
-                    style: TextStyle(fontSize: 14),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _navigateToReviews,
+                      icon: const Icon(Icons.reviews, size: 18),
+                      label: const Text('See Reviews'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: () => _navigateToReport(),
-                    icon: const Icon(Icons.flag),
-                    label: const Text('Report This Doctor'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _navigateToWriteReview,
+                      icon: const Icon(Icons.rate_review, size: 18),
+                      label: const Text('Write Review'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
+            ],
+          ),
+        ),
+      );
+    } else if (!_loadingReviews) {
+      return Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Icon(Icons.rate_review, size: 48, color: Colors.grey.shade400),
+              const SizedBox(height: 12),
+              Text(
+                'No reviews yet',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Be the first to review this doctor!',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _navigateToWriteReview,
+                  icon: const Icon(Icons.rate_review, size: 18),
+                  label: const Text('Be the First to Review'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  // NEW: Enhanced Professional Info Card
+  Widget _buildProfessionalInfoCard() {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.local_hospital,
+                    color: Colors.teal.shade600,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Professional Information',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Professional Details
+            if (_appointmentInfo!['designation'] != null)
+              _buildProfessionalDetailRow(
+                'Designation',
+                _appointmentInfo!['designation'],
+                Icons.business_center,
+              ),
+
+            if (_appointmentInfo!['specialities'] != null)
+              _buildProfessionalDetailRow(
+                'Specialities',
+                _formatSpecialities(_appointmentInfo!['specialities']),
+                Icons.medical_services,
+              ),
+
+            if (_appointmentInfo!['experience'] != null)
+              _buildProfessionalDetailRow(
+                'Experience',
+                '${_appointmentInfo!['experience']} years',
+                Icons.timeline,
+              ),
+
+            const SizedBox(height: 16),
+
+            // Check if user is logged in before showing appointment details
+            Builder(
+              builder: (context) {
+                final isLoggedIn = _supabaseClient.auth.currentUser != null;
+
+                if (!isLoggedIn) {
+                  return _buildLoginPromptContainer();
+                }
+
+                // Appointment Information button for logged-in users
+                return SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _showAppointmentInformation,
+                    icon: const Icon(Icons.info_outline, size: 18),
+                    label: const Text('Appointment Information'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Professional Detail Row
+  Widget _buildProfessionalDetailRow(
+    String label,
+    String value,
+    IconData icon,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.teal.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.teal.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.teal.shade600, size: 18),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.teal.shade600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
             ),
           ),
-
-          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  Widget _buildDetailItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+  // NEW: Login Prompt Container
+  Widget _buildLoginPromptContainer() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(Icons.lock_outline, color: Colors.blue.shade700, size: 32),
+          const SizedBox(height: 8),
           Text(
-            label,
+            'Login Required',
             style: GoogleFonts.poppins(
-              fontWeight: FontWeight.bold,
-              color: Colors.teal.shade800,
               fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue.shade700,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 15,
-              color: Colors.grey.shade800,
+            'Please log in to view appointment information',
+            style: TextStyle(color: Colors.blue.shade600, fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pushNamed(context, '/user-login');
+            },
+            icon: const Icon(Icons.login, size: 18),
+            label: const Text('Login'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
-          const Divider(height: 20),
         ],
       ),
     );
   }
 
-  // ADD THIS HELPER METHOD:
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+  // NEW: Helper Cards
+  Widget _buildLoadingCard(String message) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Column(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 12),
+              Text(message, style: TextStyle(color: Colors.grey.shade600)),
+            ],
           ),
-          Expanded(child: Text(value)),
-        ],
+        ),
       ),
     );
   }
 
+  Widget _buildNoAppointmentInfoCard() {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(Icons.info, color: Colors.grey.shade400, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              'Appointment information not available',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This doctor hasn\'t set up appointment details yet',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvitationCard() {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade50, Colors.blue.shade100],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade600,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.person_add,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Invite to TrueMedic',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Help patients by encouraging this doctor to join TrueMedic for reviews and appointment booking.',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Invitation feature coming soon!'),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.share, size: 18),
+                  label: const Text('Invite Doctor'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportCard() {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            colors: [Colors.red.shade50, Colors.red.shade100],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade600,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.report_problem,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Report Suspicious Activity',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red.shade700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Found something suspicious? Help protect others by reporting fake doctors.',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _navigateToReport,
+                  icon: const Icon(Icons.flag, size: 18),
+                  label: const Text('Report This Doctor'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ ADDED: Missing _formatSpecialities method
   String _formatSpecialities(dynamic specialities) {
     if (specialities == null) return 'N/A';
 
-    // Handle different data types
     if (specialities is String) {
-      // If it's already a string, return it as-is
       return specialities;
     } else if (specialities is List) {
-      // If it's a list, process each item
       return specialities
           .map((item) {
             if (item is String) {
@@ -972,76 +1255,62 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
           .where((s) => s.isNotEmpty)
           .join(', ');
     } else {
-      // Fallback: convert to string
       return specialities.toString();
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Doctor Details', style: GoogleFonts.poppins()),
-        actions: [
-          if (!widget.isFromLocal)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _isUpdating ? null : _checkForUpdates,
-            ),
-        ],
-      ),
-      body: _buildDoctorDetails(),
-    );
-  }
-
+  // ✅ ADDED: Missing navigation methods
   void _navigateToReviews() {
     if (_registeredDoctorId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This doctor is not registered on TrueMedic yet'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This doctor is not registered on TrueMedic yet'),
+          ),
+        );
+      }
       return;
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => DoctorReviewsScreen(
-              doctorId: _registeredDoctorId!,
-              doctorName: _doctor.fullName,
-            ),
-      ),
-    );
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => DoctorReviewsScreen(
+                doctorId: _registeredDoctorId!,
+                doctorName: _doctor.fullName,
+              ),
+        ),
+      );
+    }
   }
 
   void _navigateToWriteReview() {
     if (_registeredDoctorId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This doctor is not registered on TrueMedic yet'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This doctor is not registered on TrueMedic yet'),
+          ),
+        );
+      }
       return;
     }
 
     // Check if user is logged in
-    final supabase = Supabase.instance.client;
-    if (supabase.auth.currentUser == null) {
+    if (_supabaseClient.auth.currentUser == null) {
       _showLoginPrompt('write a review');
       return;
     }
 
-    // 🛡️ Check if user already reviewed this doctor
+    // Check if user already reviewed this doctor
     _checkAndNavigateToReview();
   }
 
-  // Add this method
   Future<void> _checkAndNavigateToReview() async {
     try {
-      final supabase = Supabase.instance.client;
-      final userId = supabase.auth.currentUser?.id;
+      final userId = _supabaseClient.auth.currentUser?.id;
       if (userId == null) return;
 
       final hasReviewed = await _reviewService.hasUserReviewed(
@@ -1049,30 +1318,34 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
         userId,
       );
 
-      if (hasReviewed) {
-        // Show option to edit existing review
-        _showExistingReviewDialog();
-      } else {
-        // Navigate to write new review
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) => WriteReviewScreen(
-                  doctorId: _registeredDoctorId!,
-                  doctorName: _doctor.fullName,
-                ),
-          ),
-        ).then((result) {
-          if (result == true) {
-            _loadDoctorReviewStats(_doctor.bmdcNumber);
-          }
-        });
+      if (mounted) {
+        if (hasReviewed) {
+          // Show option to edit existing review
+          _showExistingReviewDialog();
+        } else {
+          // Navigate to write new review
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => WriteReviewScreen(
+                    doctorId: _registeredDoctorId!,
+                    doctorName: _doctor.fullName,
+                  ),
+            ),
+          ).then((result) {
+            if (result == true) {
+              _loadDoctorReviewStats(_doctor.bmdcNumber);
+            }
+          });
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      }
     }
   }
 
@@ -1103,16 +1376,18 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   }
 
   void _navigateToReport() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => ReportDoctorScreen(
-              doctorBmdcNumber: _doctor.bmdcNumber,
-              doctorName: _doctor.fullName,
-            ),
-      ),
-    );
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => ReportDoctorScreen(
+                doctorBmdcNumber: _doctor.bmdcNumber,
+                doctorName: _doctor.fullName,
+              ),
+        ),
+      );
+    }
   }
 
   void _showLoginPrompt(String action) {
