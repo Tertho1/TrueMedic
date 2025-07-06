@@ -82,7 +82,11 @@ class _UserSignupScreenState extends State<UserSignupScreen>
             logoAsset: "assets/logo.jpeg",
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 260, left: 20, right: 20),
+            padding: EdgeInsets.only(
+              top: 260 + MediaQuery.of(context).padding.top,
+              left: 20,
+              right: 20,
+            ),
             child: SlideTransition(
               position: _formSlideAnimation,
               child: _buildSignupForm(),

@@ -91,11 +91,7 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen>
                 position: _formSlideAnimation,
                 child: Padding(
                   padding: EdgeInsets.only(
-                    top:
-                        300 +
-                        MediaQuery.of(
-                          context,
-                        ).padding.top, // ✅ Add status bar padding
+                    top: 300,
                     left: 20,
                     right: 20,
                     bottom:

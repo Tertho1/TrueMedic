@@ -450,7 +450,6 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
@@ -464,7 +463,11 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen>
             logoAsset: "assets/logo.jpeg",
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 260, left: 20, right: 20),
+            padding: EdgeInsets.only(
+              top: 260 + MediaQuery.of(context).padding.top,
+              left: 20,
+              right: 20,
+            ),
             child: SlideTransition(
               position: _formSlideAnimation,
               child: SingleChildScrollView(

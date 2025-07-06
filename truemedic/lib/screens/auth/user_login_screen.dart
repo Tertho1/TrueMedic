@@ -87,72 +87,71 @@ class _UserLoginScreenState extends State<UserLoginScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       resizeToAvoidBottomInset: true, // ✅ Handle keyboard
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight:
-                  MediaQuery.of(context).size.height -
-                  MediaQuery.of(context).padding.top -
-                  MediaQuery.of(context).padding.bottom,
-            ),
-            child: Stack(
-              children: [
-                TopClippedDesign(
-                  gradient: LinearGradient(
-                    colors: [Colors.blue.shade900, Colors.blue.shade700],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                  logoAsset: "assets/logo.jpeg",
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height,
+          ),
+          child: Stack(
+            children: [
+              TopClippedDesign(
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade900, Colors.blue.shade700],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
-                SlideTransition(
-                  position: _formSlideAnimation,
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      top: 300,
-                      left: 20,
-                      right: 20,
-                      bottom:
-                          MediaQuery.of(context).viewInsets.bottom +
-                          20, // ✅ Keyboard space
-                    ),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const SizedBox(height: 10),
-                          FadeTransition(
-                            opacity: _titleFadeAnimation,
-                            child: Text(
-                              'User Login',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade800,
-                              ),
+                logoAsset: "assets/logo.jpeg",
+              ),
+              SlideTransition(
+                position: _formSlideAnimation,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top:
+                        300 +
+                        MediaQuery.of(
+                          context,
+                        ).padding.top, // ✅ Add status bar padding
+                    left: 20,
+                    right: 20,
+                    bottom:
+                        MediaQuery.of(context).viewInsets.bottom +
+                        20, // ✅ Keyboard space
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 10),
+                        FadeTransition(
+                          opacity: _titleFadeAnimation,
+                          child: Text(
+                            'User Login',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade800,
                             ),
                           ),
-                          const SizedBox(height: 20),
-                          _buildEmailField(),
-                          const SizedBox(height: 20),
-                          _buildPasswordField(),
-                          const SizedBox(height: 20),
-                          _buildLoginButton(),
-                          const SizedBox(height: 10),
-                          _buildForgotPasswordButton(),
-                          const SizedBox(height: 10),
-                          _buildSignUpButton(),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 20),
+                        _buildEmailField(),
+                        const SizedBox(height: 20),
+                        _buildPasswordField(),
+                        const SizedBox(height: 20),
+                        _buildLoginButton(),
+                        const SizedBox(height: 10),
+                        _buildForgotPasswordButton(),
+                        const SizedBox(height: 10),
+                        _buildSignUpButton(),
+                      ],
                     ),
                   ),
                 ),
-                if (_isLoading) const LoadingIndicator(),
-              ],
-            ),
+              ),
+              if (_isLoading) const LoadingIndicator(),
+            ],
           ),
         ),
       ),

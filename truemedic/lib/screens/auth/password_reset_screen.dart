@@ -40,8 +40,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
             logoAsset: "assets/logo.jpeg",
           ),
           Padding(
-            padding: const EdgeInsets.only(
-              top: 300,
+            padding: EdgeInsets.only(
+              top: 300 + MediaQuery.of(context).padding.top,
               left: 20,
               right: 20,
               bottom: 100,
