@@ -20,24 +20,8 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _redirectUser() async {
     // Add a small delay for better UX
     await Future.delayed(const Duration(milliseconds: 1000));
-    
-    // Check if we have an active session
-    final session = supabase.auth.currentSession;
-    
     if (!mounted) return;
-    
-    // ✅ FIX: Check if this is app startup or navigation
-    final isAppStartup = ModalRoute.of(context)?.settings.name == '/splash';
-    
-    if (session != null && isAppStartup) {
-      print("✅ User is logged in on app startup: ${session.user.id}");
-      
-      // Only redirect to home on actual app startup, not when navigating back
-      Navigator.of(context).pushReplacementNamed('/home');
-      return;
-    }
-    
-    // No session or not app startup - go to welcome screen
+    // Always go to welcome screen, regardless of login status
     Navigator.of(context).pushReplacementNamed('/');
   }
 
@@ -48,11 +32,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              'assets/logo.jpeg',
-              width: 150,
-              height: 150,
-            ),
+            Image.asset('assets/logo.jpeg', width: 150, height: 150),
             const SizedBox(height: 30),
             const CircularProgressIndicator(),
             const SizedBox(height: 20),

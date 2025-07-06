@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -42,12 +43,23 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         setState(() => _appName += "TrueMedic"[_currentLetterIndex++]);
         return true;
       } else {
-        Future.delayed(const Duration(seconds: 1), () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const AnimatedLoginScreen()),
-          );
-        });
+        // Check login status after app name animation completes
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) {
+          final supabase = Supabase.instance.client;
+          final session = supabase.auth.currentSession;
+
+          if (session != null) {
+            // User is logged in, go directly to home
+            Navigator.pushReplacementNamed(context, '/home');
+          } else {
+            // User not logged in, show login screen
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const AnimatedLoginScreen()),
+            );
+          }
+        }
         return false;
       }
     });
@@ -117,10 +129,12 @@ class _AnimatedLoginScreenState extends State<AnimatedLoginScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
-    Future.delayed(
-      const Duration(milliseconds: 300),
-      () => _controller.forward(),
-    );
+    // Start animation after a short delay
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _controller.forward();
+      }
+    });
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../screens/welcome_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   final supabase = Supabase.instance.client;
@@ -178,7 +179,7 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
-  // ✅ SIMPLIFIED: Much simpler logout function
+  // ✅ FIXED: Proper logout function without loading dialog issues
   Future<void> _handleLogout(BuildContext context) async {
     try {
       // Show confirmation dialog first
@@ -213,25 +214,17 @@ class AppDrawer extends StatelessWidget {
 
       if (shouldLogout != true) return;
 
-      // Close drawer
+      // Close drawer first
       Navigator.pop(context);
 
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
-
-      // Perform logout
+      // Perform logout immediately without loading dialog
       await supabase.auth.signOut();
 
-      // Navigate to home
+      // Navigate to welcome screen
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil('/home', (route) => false);
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AnimatedLoginScreen()),
+        );
 
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -244,7 +237,6 @@ class AppDrawer extends StatelessWidget {
     } catch (e) {
       print('Logout error: $e');
       if (context.mounted) {
-        Navigator.pop(context); // Close any open dialogs
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Logout failed: ${e.toString()}'),
