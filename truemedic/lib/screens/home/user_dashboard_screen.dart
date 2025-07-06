@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../reviews/user_reviews_screen.dart';
 import '../reports/report_doctor_screen.dart';
+import '../../widgets/app_drawer.dart'; // Add this import
 
 class UserDashboardScreen extends StatefulWidget {
   const UserDashboardScreen({super.key});
@@ -127,21 +128,33 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // ✅ ADD HAMBURGER DRAWER
+      drawer: AppDrawer(),
       appBar: AppBar(
         title: const Text('My Profile'),
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
+        // ✅ The hamburger menu is automatically added by Flutter when drawer is present
       ),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: () async {
+                await _loadUserProfile();
+                await _loadReviewCount();
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(), // For pull-to-refresh
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // User Info Card
                     Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
@@ -167,8 +180,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         _userProfile?['full_name'] ?? 'User',
@@ -183,6 +195,27 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                           color: Colors.grey.shade600,
                                         ),
                                       ),
+                                      // ✅ ADD REVIEW COUNT DISPLAY
+                                      if (_reviewCount > 0)
+                                        Container(
+                                          margin: const EdgeInsets.only(top: 8),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, 
+                                            vertical: 4
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.teal.shade100,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            '$_reviewCount Reviews Written',
+                                            style: TextStyle(
+                                              color: Colors.teal.shade700,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -206,6 +239,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     const SizedBox(height: 16),
 
                     Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Column(
                         children: [
                           ListTile(
@@ -214,18 +251,44 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                               color: Colors.blue,
                             ),
                             title: const Text('My Reviews'),
-                            subtitle: const Text(
-                              'View and manage your doctor reviews',
+                            subtitle: Text(
+                              _reviewCount > 0
+                                  ? 'You have written $_reviewCount reviews'
+                                  : 'You haven\'t written any reviews yet',
                             ),
-                            trailing: const Icon(Icons.arrow_forward_ios),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_reviewCount > 0)
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.blue,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      '$_reviewCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_forward_ios),
+                              ],
+                            ),
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder:
-                                      (context) => const UserReviewsScreen(),
+                                  builder: (context) => const UserReviewsScreen(),
                                 ),
-                              );
+                              ).then((_) {
+                                // Refresh count when returning
+                                _loadReviewCount();
+                              });
                             },
                           ),
                           const Divider(),
@@ -240,7 +303,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             ),
                             trailing: const Icon(Icons.arrow_forward_ios),
                             onTap: () {
-                              Navigator.pushNamed(context, '/');
+                              // ✅ FIX: Navigate to home screen instead of '/'
+                              Navigator.pushNamed(context, '/home');
                             },
                           ),
                         ],
@@ -260,6 +324,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     const SizedBox(height: 16),
 
                     Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Column(
                         children: [
                           ListTile(
@@ -276,8 +344,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder:
-                                      (context) => const ReportDoctorScreen(),
+                                  builder: (context) => const ReportDoctorScreen(),
                                 ),
                               );
                             },
@@ -285,25 +352,40 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           const Divider(),
                           ListTile(
                             leading: const Icon(
-                              Icons.logout,
-                              color: Colors.grey,
+                              Icons.info_outline,
+                              color: Colors.blue,
                             ),
-                            title: const Text('Logout'),
-                            onTap: () async {
-                              await supabase.auth.signOut();
-                              Navigator.pushNamedAndRemoveUntil(
-                                context,
-                                '/',
-                                (route) => false,
+                            title: const Text('About TrueMedic'),
+                            subtitle: const Text(
+                              'Learn more about our platform',
+                            ),
+                            trailing: const Icon(Icons.arrow_forward_ios),
+                            onTap: () {
+                              showAboutDialog(
+                                context: context,
+                                applicationName: 'TrueMedic',
+                                applicationVersion: '1.0.0',
+                                applicationIcon: Image.asset(
+                                  'assets/logo.jpeg',
+                                  width: 50,
+                                  height: 50,
+                                ),
+                                children: const [
+                                  Text(
+                                    'TrueMedic helps verify doctor credentials and connect patients with healthcare professionals.',
+                                  ),
+                                ],
                               );
                             },
                           ),
+                          // ✅ REMOVE STANDALONE LOGOUT - IT'S NOW IN THE DRAWER
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
+            ),
     );
   }
 }

@@ -350,6 +350,9 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
           '   - Pending: ${registeredDoctorResponse['verification_pending']}',
         );
         print('   - Rejected: ${registeredDoctorResponse['rejected']}');
+        print(
+          '   - Raw Data: ${registeredDoctorResponse.toString()}',
+        ); // Add this line
 
         // Check if doctor is verified
         final isVerified = registeredDoctorResponse['verified'] == true;
@@ -641,7 +644,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
             ],
           ],
 
-          // Appointment Information (only for registered doctors and logged-in users)
+          // Appointment Information (only for registered doctors)
           if (_isRegisteredDoctor && _appointmentInfo != null) ...[
             Card(
               margin: const EdgeInsets.symmetric(vertical: 8),
@@ -686,25 +689,81 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                     ],
 
                     const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement appointment booking
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Appointment booking coming soon!'),
+
+                    // ✅ UPDATED: Check if user is logged in before showing appointment details
+                    Builder(
+                      builder: (context) {
+                        final supabase = Supabase.instance.client;
+                        final isLoggedIn = supabase.auth.currentUser != null;
+
+                        if (!isLoggedIn) {
+                          // Show login prompt for non-logged-in users
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue.shade200),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.lock_outline,
+                                  color: Colors.blue.shade700,
+                                  size: 32,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Login Required',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Please log in to view appointment information',
+                                  style: TextStyle(
+                                    color: Colors.blue.shade600,
+                                    fontSize: 14,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 12),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.pushNamed(context, '/user-login');
+                                  },
+                                  icon: const Icon(Icons.login),
+                                  label: const Text('Login'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           );
-                        },
-                        icon: const Icon(Icons.calendar_month),
-                        label: const Text('Book Appointment'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
+                        }
+
+                        // ✅ UPDATED: "Appointment Information" button for logged-in users
+                        return SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              _showAppointmentInformation();
+                            },
+                            icon: const Icon(Icons.info_outline),
+                            label: const Text('Appointment Information'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -981,6 +1040,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   // Add this method
   Future<void> _checkAndNavigateToReview() async {
     try {
+      final supabase = Supabase.instance.client;
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) return;
 
@@ -997,10 +1057,11 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => WriteReviewScreen(
-              doctorId: _registeredDoctorId!,
-              doctorName: _doctor.fullName,
-            ),
+            builder:
+                (context) => WriteReviewScreen(
+                  doctorId: _registeredDoctorId!,
+                  doctorName: _doctor.fullName,
+                ),
           ),
         ).then((result) {
           if (result == true) {
@@ -1009,34 +1070,35 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
   }
 
   void _showExistingReviewDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Review Already Exists'),
-        content: const Text(
-          'You have already reviewed this doctor. Would you like to edit your existing review?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Review Already Exists'),
+            content: const Text(
+              'You have already reviewed this doctor. Would you like to edit your existing review?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/user-reviews');
+                },
+                child: const Text('Edit My Review'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushNamed(context, '/user-reviews');
-            },
-            child: const Text('Edit My Review'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1076,6 +1138,420 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
           ),
     );
   }
+
+  // Method to show detailed appointment information modal
+  void _showAppointmentInformation() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            maxChildSize: 0.9,
+            minChildSize: 0.5,
+            builder: (context, scrollController) {
+              return Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Appointment Information',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.teal.shade700,
+                              ),
+                            ),
+                            Text(
+                              'Dr. ${_doctor.fullName}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+
+                    const Divider(height: 30),
+
+                    // Professional Information Section
+                    _buildModalSection(
+                      'Professional Information',
+                      Icons.medical_services,
+                      [
+                        if (_appointmentInfo!['designation'] != null)
+                          _buildModalDetailRow(
+                            'Designation',
+                            _appointmentInfo!['designation'],
+                          ),
+                        if (_appointmentInfo!['specialities'] != null)
+                          _buildModalDetailRow(
+                            'Specialities',
+                            _formatSpecialities(
+                              _appointmentInfo!['specialities'],
+                            ),
+                          ),
+                        if (_appointmentInfo!['experience'] != null)
+                          _buildModalDetailRow(
+                            'Experience',
+                            '${_appointmentInfo!['experience']} years',
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Appointment Locations Section
+                    _buildModalSection(
+                      'Appointment Locations',
+                      Icons.location_on,
+                      [],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Locations List
+                    Expanded(
+                      child:
+                          (_appointmentInfo!['locations'] as List?)
+                                      ?.isNotEmpty ==
+                                  true
+                              ? ListView.builder(
+                                controller: scrollController,
+                                itemCount:
+                                    (_appointmentInfo!['locations'] as List)
+                                        .length,
+                                itemBuilder: (context, index) {
+                                  final location =
+                                      (_appointmentInfo!['locations']
+                                          as List)[index];
+                                  return _buildLocationDetailCard(location);
+                                },
+                              )
+                              : Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.location_off,
+                                      size: 48,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'No appointment locations configured',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'This doctor hasn\'t set up appointment locations yet',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Contact Information Notice
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue.shade700),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Contact the doctor directly using the provided phone numbers to schedule appointments.',
+                              style: TextStyle(
+                                color: Colors.blue.shade700,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+    );
+  }
+
+  // Helper method to build modal sections
+  Widget _buildModalSection(
+    String title,
+    IconData icon,
+    List<Widget> children,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: Colors.teal.shade700),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal.shade700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...children,
+      ],
+    );
+  }
+
+  // Helper method to build modal detail rows
+  Widget _buildModalDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
+        ],
+      ),
+    );
+  }
+
+  // Helper method to build detailed location cards
+  Widget _buildLocationDetailCard(Map<String, dynamic> location) {
+    final availableDays = (location['available_days'] as List<dynamic>?) ?? [];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.teal.shade50,
+        border: Border.all(color: Colors.teal.shade200),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Location Name
+          Row(
+            children: [
+              Icon(Icons.business, color: Colors.teal.shade700),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  location['location_name'] ?? 'Unnamed Location',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Address
+          if (location['address'] != null &&
+              location['address'].toString().isNotEmpty) ...[
+            _buildLocationDetailRow(
+              Icons.place,
+              'Address',
+              location['address'],
+              Colors.grey.shade600,
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          // Contact Number
+          if (location['contact_number'] != null &&
+              location['contact_number'].toString().isNotEmpty) ...[
+            _buildLocationDetailRow(
+              Icons.phone,
+              'Contact',
+              location['contact_number'],
+              Colors.green.shade600,
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          // Timing
+          _buildLocationDetailRow(
+            Icons.access_time,
+            'Timing',
+            '${_formatTime12Hour(location['start_time'])} - ${_formatTime12Hour(location['end_time'])}',
+            Colors.blue.shade600,
+          ),
+          const SizedBox(height: 8),
+
+          // Appointment Details
+          Row(
+            children: [
+              Expanded(
+                child: _buildLocationDetailRow(
+                  Icons.timer,
+                  'Duration',
+                  '${location['appointment_duration']} min',
+                  Colors.purple.shade600,
+                ),
+              ),
+              Expanded(
+                child: _buildLocationDetailRow(
+                  Icons.event_available,
+                  'Max/Day',
+                  '${location['max_appointments_per_day']}',
+                  Colors.orange.shade600,
+                ),
+              ),
+            ],
+          ),
+
+          // Available Days
+          if (availableDays.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  size: 16,
+                  color: Colors.teal.shade600,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Available Days:',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children:
+                  availableDays.map<Widget>((day) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.teal.shade300),
+                      ),
+                      child: Text(
+                        day.toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.teal.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Helper method to build location detail rows
+  Widget _buildLocationDetailRow(
+    IconData icon,
+    String label,
+    String value,
+    Color iconColor,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: iconColor),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+            fontSize: 14,
+          ),
+        ),
+        Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
+      ],
+    );
+  }
+
+  // Helper method to format time to 12-hour format
+  String _formatTime12Hour(String? time24) {
+    if (time24 == null) return 'N/A';
+
+    try {
+      final parts = time24.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final hour12 = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+
+      return '$hour12:${minute.toString().padLeft(2, '0')} $period';
+    } catch (e) {
+      return time24;
+    }
+  }
+
+  // Add getter for supabase instance
+  Supabase get supabase => Supabase.instance;
 }
 
 class Doctor {
