@@ -4,6 +4,7 @@ import '../../widgets/base_scaffold.dart';
 // import '../loading_indicator.dart';
 import 'doctor_verification_screen.dart';
 import '../admin/admin_reports_screen.dart'; // Add this line
+import 'dart:async';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -20,6 +21,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   List<Map<String, dynamic>> _verifiedDoctors = []; // Add this
   List<Map<String, dynamic>> _rejectedDoctors = []; // Add this
   late TabController _tabController;
+  StreamSubscription<AuthState>? _authSubscription;
 
   @override
   void initState() {
@@ -30,6 +32,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     ); // Changed from 3 to 4
     _checkAdminRole();
     _fetchAllDoctors(); // Replace individual fetch with combined method
+    _setupAuthListener();
+  }
+
+  // Setup auth state listener
+  void _setupAuthListener() {
+    _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedOut) {
+        // User has been logged out, navigate to user-or-doctor screen
+        if (mounted) {
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/user-or-doctor', (route) => false);
+        }
+      }
+    });
   }
 
   // New combined fetch method
@@ -445,5 +462,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

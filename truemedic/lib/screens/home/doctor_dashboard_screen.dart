@@ -6,6 +6,7 @@ import '../loading_indicator.dart';
 import '../../widgets/base_scaffold.dart';
 import 'doctor_resubmit_screen.dart';
 import 'doctor_appointment_details_screen.dart';
+import 'dart:async';
 
 class DoctorDashboardScreen extends StatefulWidget {
   const DoctorDashboardScreen({super.key});
@@ -19,6 +20,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   Map<String, dynamic>? _doctorProfile;
   bool _isLoading = true;
   bool _isLoggingOut = false;
+  StreamSubscription<AuthState>? _authSubscription;
 
   // Professional details variables (from doctor_appointments table)
   Map<String, dynamic>? _appointmentDetails;
@@ -33,6 +35,21 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   void initState() {
     super.initState();
     _initializeDashboard();
+    _setupAuthListener();
+  }
+
+  // Setup auth state listener
+  void _setupAuthListener() {
+    _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedOut) {
+        // User has been logged out, navigate to user-or-doctor screen
+        if (mounted) {
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/user-or-doctor', (route) => false);
+        }
+      }
+    });
   }
 
   @override
@@ -41,6 +58,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     _designationController.dispose();
     _specialitiesController.dispose();
     _experienceController.dispose();
+    _authSubscription?.cancel();
     super.dispose();
   }
 
@@ -130,22 +148,6 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
-    }
-  }
-
-  Future<void> _logout() async {
-    setState(() => _isLoggingOut = true);
-    try {
-      await supabase.auth.signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
-      }
-    } catch (e) {
-      if (mounted) {
-        _showError('Error logging out: ${e.toString()}');
-      }
-    } finally {
-      if (mounted) setState(() => _isLoggingOut = false);
     }
   }
 

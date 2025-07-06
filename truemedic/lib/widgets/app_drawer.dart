@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../screens/welcome_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   final supabase = Supabase.instance.client;
@@ -225,11 +224,11 @@ class AppDrawer extends StatelessWidget {
       // Perform logout immediately without loading dialog
       await supabase.auth.signOut();
 
-      // Navigate to welcome screen
+      // Navigate to user-or-doctor screen and clear all routes
       if (context.mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const AnimatedLoginScreen()),
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil('/user-or-doctor', (route) => false);
 
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(

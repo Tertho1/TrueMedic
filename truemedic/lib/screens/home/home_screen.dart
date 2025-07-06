@@ -4,11 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:supabase/supabase.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'search_screen.dart';
 import '../common_ui.dart';
 import '../loading_indicator.dart';
 import '../../widgets/app_drawer.dart';
+import 'dart:async';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,6 +32,9 @@ class _HomeScreenState extends State<HomeScreen>
   // ✅ ADD: Loading state for search button
   bool _isSearchLoading = false;
 
+  // ✅ ADD: Auth state listening
+  StreamSubscription<AuthState>? _authSubscription;
+
   final SupabaseClient supabaseClient = SupabaseClient(
     'https://zntlbtxvhpyoydqggtgw.supabase.co',
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpudGxidHh2aHB5b3lkcWdndGd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NDY5NjEsImV4cCI6MjA1NjUyMjk2MX0.ghWxTU_yKCkZ5KabTi7n7OGP2J24u0q3erAZgNunw7U',
@@ -40,6 +44,24 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
+    _initializeSession();
+    _setupAuthListener();
+  }
+
+  // ✅ ADD: Setup auth state listener
+  void _setupAuthListener() {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
+      if (data.event == AuthChangeEvent.signedOut) {
+        // User has been logged out, navigate to user-or-doctor screen
+        if (mounted) {
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/user-or-doctor', (route) => false);
+        }
+      }
+    });
   }
 
   void _initializeAnimations() {
@@ -49,14 +71,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     _contentSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5),
+      begin: const Offset(0, 1),
       end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.6, 1, curve: Curves.easeOut),
-      ),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     // ✅ FIX: Start animation immediately
     _controller.forward().then((_) {
@@ -68,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     _controller.dispose();
     _searchController.dispose();
+    _authSubscription?.cancel(); // ✅ ADD: Cancel auth subscription
     super.dispose();
   }
 
