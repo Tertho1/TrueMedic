@@ -606,7 +606,7 @@ class _HomeScreenState extends State<HomeScreen>
       print('✅ Doctor stored successfully in $table table');
     } catch (e) {
       print('❌ Error storing doctor: $e');
-      throw e;
+      rethrow;
     }
   }
 

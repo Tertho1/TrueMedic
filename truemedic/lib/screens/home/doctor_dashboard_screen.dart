@@ -19,7 +19,7 @@ class DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   final supabase = Supabase.instance.client;
   Map<String, dynamic>? _doctorProfile;
   bool _isLoading = true;
-  bool _isLoggingOut = false;
+  final bool _isLoggingOut = false;
   StreamSubscription<AuthState>? _authSubscription;
 
   // Professional details variables (from doctor_appointments table)
