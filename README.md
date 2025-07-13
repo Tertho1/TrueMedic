@@ -1,7 +1,7 @@
 # 🏥 TrueMedic - Doctor Verification Platform
 
 <div align="center">
-  <img src="assets/true_medic_logo.png" alt="TrueMedic Logo" width="200"/>
+  <img src="truemedic/assets/true_medic_logo.png" alt="TrueMedic Logo" width="200"/>
   
   **A comprehensive Flutter application for verifying doctor credentials in Bangladesh**
   
@@ -81,9 +81,9 @@ TrueMedic addresses a critical need in Bangladesh's healthcare system by providi
       <td align="center"><strong>🔍 Doctor Search</strong></td>
     </tr>
     <tr>
-      <td><img src="docs/screenshots/auth.png" width="200" alt="Authentication"/></td>
-      <td><img src="docs/screenshots/home.png" width="200" alt="Home Screen"/></td>
-      <td><img src="docs/screenshots/search.png" width="200" alt="Doctor Search"/></td>
+      <td><img src="truemedic/docs/screenshots/auth.png" width="200" alt="Authentication"/></td>
+      <td><img src="truemedic/docs/screenshots/home.png" width="200" alt="Home Screen"/></td>
+      <td><img src="truemedic/docs/screenshots/search.png" width="200" alt="Doctor Search"/></td>
     </tr>
   </table>
 </div>
